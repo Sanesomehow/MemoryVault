@@ -3,18 +3,22 @@
 // import { MemoCard } from "@/components/memo-card";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { decryptPhoto, Encrypt } from "@/lib/crypto/encrypt";
-import {encryptAESKey} from "@/lib/crypto/keyEncryption";
+import { encryptAESKey } from "@/lib/crypto/keyEncryption";
 import { useWallet, WalletProvider } from "@solana/wallet-adapter-react";
 import nacl from "tweetnacl";
 import React, { useEffect, useState } from "react";
 
 export default function Home() {
   const [file, setFile] = useState<File>();
-  const [result, setResult] = useState<{url: string, cid: string, metadataCid: string}>();
+  const [result, setResult] = useState<{
+    url: string;
+    cid: string;
+    metadataCid: string;
+  }>();
   const [uploading, setUploading] = useState(false);
   const [displayUrl, setDisplayUrl] = useState<string>();
+
   const { connected, signMessage, publicKey } = useWallet();
-  const [storedSig, setStoredSig] = useState<any>();
 
   const uploadFile = async () => {
     try {
@@ -22,53 +26,46 @@ export default function Home() {
         alert("No file selected");
         return;
       }
-      if(!connected || !signMessage || !publicKey) {
+      if (!connected || !signMessage || !publicKey) {
         alert("wallet connection error");
         return;
       }
 
       setUploading(true);
-      
-      const message: string = "Upload this for me";
-      const encMessage = new TextEncoder().encode(message);
-      const sig  = await signMessage(encMessage)
-      setStoredSig(sig);
-      const isValid = nacl.sign.detached.verify(encMessage, sig, publicKey?.toBytes());
 
-      if(!isValid) {
-        alert("invalid signature");
-        setUploading(false);
-        return;
-      }
       const { encFile, keyArray, IV } = await Encrypt(file);
-      const {encrypted: encryptedKey, nonce } = await encryptAESKey(keyArray, sig)
+
+      const { encrypted: encryptedKey, nonce } = await encryptAESKey(
+        keyArray,
+        publicKey.toBytes()
+      );
 
       console.log("AES key encrypted successfully");
 
       const data = new FormData();
-
-      data.set('file', encFile);
-      data.set('name', file.name);
-      data.set('iv', IV);
-      data.set('size', file.size.toString());
-
-      data.set('encryptedKey', encryptedKey);
-      data.set('nonce', nonce);
+      data.set("file", encFile);
+      data.set("name", file.name);
+      data.set("iv", IV);
+      data.set("size", file.size.toString());
+      data.set("encryptedKey", encryptedKey);
+      data.set("nonce", nonce);
 
       const uploadRequest = await fetch("/api/files", {
         method: "POST",
         body: data,
       });
 
-      if(!uploadRequest.ok) {
+      if (!uploadRequest.ok) {
         throw new Error("Upload failed");
       }
 
       const result = await uploadRequest.json();
+      console.log("upload request:", uploadRequest);
       setResult(result);
       setUploading(false);
       alert("Photo uploaded successfully");
-      getFile(result);
+
+      await getFile(result);
     } catch (e) {
       console.log(e);
       setUploading(false);
@@ -76,35 +73,34 @@ export default function Home() {
     }
   };
 
-  const getFile = async (result: {url: string, cid: string, metadataCid: string}) => {
+  const getFile = async (result: {
+    url: string;
+    cid: string;
+    metadataCid: string;
+  }) => {
+    try {
+      if (!result || !publicKey) {
+        alert("No result or wallet not connected");
+        return;
+      }
 
-    console.log("storedSig type:", storedSig?.constructor.name);
-  console.log("storedSig instanceof Uint8Array:", storedSig instanceof Uint8Array);
-  console.log("storedSig value:", storedSig);
+      console.log("Decrypting photo...");
 
-  
-    if(!result || !signMessage) {
-      alert("No result or wallet not connected");
-      return;
+      const displayUrl = await decryptPhoto({
+        url: result.url,
+        cid: result.cid,
+        metadataCid: result.metadataCid,
+        publicKey: publicKey.toBytes(),
+      });
+
+      console.log("Photo decrypted successfully.");
+      setDisplayUrl(displayUrl);
+      console.log("Decrypted message url: ", displayUrl);
+    } catch (e) { 
+      console.error("Decryption failed:", e);
+      alert("Failed to decrypt photo: " + (e as Error).message);
     }
-    const message = "Upload this for me.";
-    const encMessage = new TextEncoder().encode(message);
-    const sig = await signMessage(encMessage);  
-    const sigArray = storedSig instanceof Uint8Array 
-    ? storedSig 
-    : new Uint8Array(storedSig);
-    const displayUrl = await decryptPhoto({
-      url: result.url,
-      cid: result.cid,
-      metadataCid: result.metadataCid,
-      sig: sigArray
-    });
-
-    setDisplayUrl(displayUrl);
-
-    console.log("Decrypted message url: ", displayUrl);
-
-  }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFile(e.target?.files?.[0]);
@@ -119,23 +115,31 @@ export default function Home() {
           </div>
         </div>
       </div>
-      {!connected && 
+      {!connected && (
         <div>
           <p>Please connect your wallet to upload photos.</p>
         </div>
-      }
+      )}
       <input type="file" onChange={handleChange} />
-      <button type="button" disabled={uploading || !connected} onClick={uploadFile}>
+      <button
+        type="button"
+        disabled={uploading || !connected}
+        onClick={uploadFile}
+      >
         {uploading ? "Uploading..." : "Upload"}
       </button>
 
-      {result?.url && (<div>
-        <p>Photo uploaded successfully, URL: {result.url}</p>
-      </div>) }
+      {result?.url && (
+        <div>
+          <p>Photo uploaded successfully, URL: {result.url}</p>
+        </div>
+      )}
 
-      {displayUrl && <div>
-        <img src={displayUrl} alt="" />
-      </div> }
+      {displayUrl && (
+        <div>
+          <img src={displayUrl} alt="" />
+        </div>
+      )}
     </main>
   );
 }

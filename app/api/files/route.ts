@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
     const ivString = data.get("iv")?.toString() ?? "";
     const encryptedKey = data.get("encryptedKey")?.toString() ?? "";
     const nonce = data.get("nonce")?.toString() ?? "";
-    const photoId = data.get("photoId")?.toString() ?? "";
 
     if (!file) {
       return NextResponse.json(
@@ -31,7 +30,6 @@ export async function POST(request: NextRequest) {
       description: "Encrypted photo from MemoryVault",
       image: `ipfs://${cid}`,
       properties: {
-        photoId: photoId,
         encrypted_content_cid: cid,
         encryption_params: {
           iv: ivString,

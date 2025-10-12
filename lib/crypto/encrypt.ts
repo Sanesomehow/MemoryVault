@@ -38,8 +38,17 @@ export async function Encrypt(file: File) {
 
 }
 
-export async function decryptPhoto({url, cid, metadataCid, sig}: {url: string, cid: string, metadataCid: string, sig:Uint8Array}) {
-    // const metadata = await pinata.files.public.get(metadataCid);
+export async function decryptPhoto({
+    url, 
+    cid, 
+    metadataCid, 
+    publicKey
+}: {
+    url: string, 
+    cid: string, 
+    metadataCid: string, 
+    publicKey: Uint8Array
+}) {
     const metadataUrl = `https://${gatewayUrl}/ipfs/${metadataCid}`;
     const metadataRes = await fetch(metadataUrl);
     const metadata = await metadataRes.json();
@@ -49,33 +58,33 @@ export async function decryptPhoto({url, cid, metadataCid, sig}: {url: string, c
     const nonce = metadata.properties.encryption_params.nonce;
     const encryptedKey = metadata.properties.owner_encrypted_key;
 
-    const aesKeyArray = decryptAESKey(encryptedKey, nonce, sig);
+    const aesKeyArray = decryptAESKey(encryptedKey, nonce, publicKey);
     if(!aesKeyArray) {
         throw new Error("Failed to decrypt AES key");
     }
 
     const aesKey = await window.crypto.subtle.importKey(
-    'raw',
-    aesKeyArray as BufferSource,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt']
-  );
+        'raw',
+        aesKeyArray as BufferSource,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+    );
 
-  const imageUrl = `https://${gatewayUrl}/ipfs/${encryptedContentCid}`;
-  const encryptedResponse = await fetch(imageUrl);
-  const encryptedBuffer = await encryptedResponse.arrayBuffer();
+    const imageUrl = `https://${gatewayUrl}/ipfs/${encryptedContentCid}`;
+    const encryptedResponse = await fetch(imageUrl);
+    const encryptedBuffer = await encryptedResponse.arrayBuffer();
 
-  const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+    const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
 
-  const decryptedBuffer = await window.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    aesKey,
-    encryptedBuffer
-  );
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        aesKey,
+        encryptedBuffer
+    );
 
-  const blob = new Blob([decryptedBuffer], {type: "image/png"});
-  const displayUrl = URL.createObjectURL(blob);
+    const blob = new Blob([decryptedBuffer], {type: "image/png"});
+    const displayUrl = URL.createObjectURL(blob);
 
-  return displayUrl;
+    return displayUrl;
 }
