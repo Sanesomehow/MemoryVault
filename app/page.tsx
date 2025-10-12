@@ -10,9 +10,11 @@ import React, { useEffect, useState } from "react";
 
 export default function Home() {
   const [file, setFile] = useState<File>();
-  const [result, setResult] = useState<{url: string, cid: string}>();
+  const [result, setResult] = useState<{url: string, cid: string, metadataCid: string}>();
   const [uploading, setUploading] = useState(false);
+  const [displayUrl, setDisplayUrl] = useState<string>();
   const { connected, signMessage, publicKey } = useWallet();
+  const [storedSig, setStoredSig] = useState<any>();
 
   const uploadFile = async () => {
     try {
@@ -30,6 +32,7 @@ export default function Home() {
       const message: string = "Upload this for me";
       const encMessage = new TextEncoder().encode(message);
       const sig  = await signMessage(encMessage)
+      setStoredSig(sig);
       const isValid = nacl.sign.detached.verify(encMessage, sig, publicKey?.toBytes());
 
       if(!isValid) {
@@ -37,7 +40,6 @@ export default function Home() {
         setUploading(false);
         return;
       }
-      
       const { encFile, keyArray, IV } = await Encrypt(file);
       const {encrypted: encryptedKey, nonce } = await encryptAESKey(keyArray, sig)
 
@@ -47,10 +49,10 @@ export default function Home() {
 
       data.set('file', encFile);
       data.set('name', file.name);
-      data.set('iv', Array.from(IV).toString());
+      data.set('iv', IV);
       data.set('size', file.size.toString());
 
-      data.set('encryptedKey', Array.from(encryptedKey).toString());
+      data.set('encryptedKey', encryptedKey);
       data.set('nonce', nonce);
 
       const uploadRequest = await fetch("/api/files", {
@@ -63,11 +65,9 @@ export default function Home() {
       }
 
       const result = await uploadRequest.json();
-      console.log(result);
       setResult(result);
       setUploading(false);
       alert("Photo uploaded successfully");
-      console.log("signed url: ",result.url);
       getFile(result);
     } catch (e) {
       console.log(e);
@@ -76,12 +76,33 @@ export default function Home() {
     }
   };
 
-  const getFile = async (result: {url: string, cid: string}) => {
-    if(!result) {
-      alert("No url found");
+  const getFile = async (result: {url: string, cid: string, metadataCid: string}) => {
+
+    console.log("storedSig type:", storedSig?.constructor.name);
+  console.log("storedSig instanceof Uint8Array:", storedSig instanceof Uint8Array);
+  console.log("storedSig value:", storedSig);
+
+  
+    if(!result || !signMessage) {
+      alert("No result or wallet not connected");
       return;
     }
-    const res = decryptPhoto(result);
+    const message = "Upload this for me.";
+    const encMessage = new TextEncoder().encode(message);
+    const sig = await signMessage(encMessage);  
+    const sigArray = storedSig instanceof Uint8Array 
+    ? storedSig 
+    : new Uint8Array(storedSig);
+    const displayUrl = await decryptPhoto({
+      url: result.url,
+      cid: result.cid,
+      metadataCid: result.metadataCid,
+      sig: sigArray
+    });
+
+    setDisplayUrl(displayUrl);
+
+    console.log("Decrypted message url: ", displayUrl);
 
   }
 
@@ -111,6 +132,10 @@ export default function Home() {
       {result?.url && (<div>
         <p>Photo uploaded successfully, URL: {result.url}</p>
       </div>) }
+
+      {displayUrl && <div>
+        <img src={displayUrl} alt="" />
+      </div> }
     </main>
   );
 }
