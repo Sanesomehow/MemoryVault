@@ -1,103 +1,116 @@
-import Image from "next/image";
+"use client";
+
+// import { MemoCard } from "@/components/memo-card";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { decryptPhoto, Encrypt } from "@/lib/crypto/encrypt";
+import {encryptAESKey} from "@/lib/crypto/keyEncryption";
+import { useWallet, WalletProvider } from "@solana/wallet-adapter-react";
+import nacl from "tweetnacl";
+import React, { useEffect, useState } from "react";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [file, setFile] = useState<File>();
+  const [result, setResult] = useState<{url: string, cid: string}>();
+  const [uploading, setUploading] = useState(false);
+  const { connected, signMessage, publicKey } = useWallet();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const uploadFile = async () => {
+    try {
+      if (!file) {
+        alert("No file selected");
+        return;
+      }
+      if(!connected || !signMessage || !publicKey) {
+        alert("wallet connection error");
+        return;
+      }
+
+      setUploading(true);
+      
+      const message: string = "Upload this for me";
+      const encMessage = new TextEncoder().encode(message);
+      const sig  = await signMessage(encMessage)
+      const isValid = nacl.sign.detached.verify(encMessage, sig, publicKey?.toBytes());
+
+      if(!isValid) {
+        alert("invalid signature");
+        setUploading(false);
+        return;
+      }
+      
+      const { encFile, keyArray, IV } = await Encrypt(file);
+      const {encrypted: encryptedKey, nonce } = await encryptAESKey(keyArray, sig)
+
+      console.log("AES key encrypted successfully");
+
+      const data = new FormData();
+
+      data.set('file', encFile);
+      data.set('name', file.name);
+      data.set('iv', Array.from(IV).toString());
+      data.set('size', file.size.toString());
+
+      data.set('encryptedKey', Array.from(encryptedKey).toString());
+      data.set('nonce', nonce);
+
+      const uploadRequest = await fetch("/api/files", {
+        method: "POST",
+        body: data,
+      });
+
+      if(!uploadRequest.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const result = await uploadRequest.json();
+      console.log(result);
+      setResult(result);
+      setUploading(false);
+      alert("Photo uploaded successfully");
+      console.log("signed url: ",result.url);
+      getFile(result);
+    } catch (e) {
+      console.log(e);
+      setUploading(false);
+      alert("Trouble uploading file");
+    }
+  };
+
+  const getFile = async (result: {url: string, cid: string}) => {
+    if(!result) {
+      alert("No url found");
+      return;
+    }
+    const res = decryptPhoto(result);
+
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target?.files?.[0]);
+  };
+
+  return (
+    <main>
+      <div className=" flex items-center justify-end p-4">
+        <div className="w-full max-w-full bg-card rounded-lg border shadow-lg p-6 space-y-6">
+          <div className="flex justify-end  ">
+            <WalletConnectButton />
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+      {!connected && 
+        <div>
+          <p>Please connect your wallet to upload photos.</p>
+        </div>
+      }
+      <input type="file" onChange={handleChange} />
+      <button type="button" disabled={uploading || !connected} onClick={uploadFile}>
+        {uploading ? "Uploading..." : "Upload"}
+      </button>
+
+      {result?.url && (<div>
+        <p>Photo uploaded successfully, URL: {result.url}</p>
+      </div>) }
+    </main>
   );
 }
