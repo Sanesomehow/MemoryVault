@@ -7,6 +7,7 @@ import { encryptAESKey } from "@/lib/crypto/keyEncryption";
 import { useWallet, WalletProvider } from "@solana/wallet-adapter-react";
 import nacl from "tweetnacl";
 import React, { useEffect, useState } from "react";
+import { mintPhotoNFT } from "@/lib/metaplex/umiMint";
 
 export default function Home() {
   const [file, setFile] = useState<File>();
@@ -66,6 +67,22 @@ export default function Home() {
       alert("Photo uploaded successfully");
 
       await getFile(result);
+
+      // const mintRequest = await fetch("/api/mint", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     name: file.name,
+      //     uri: `ipfs://${result.metadataCid}`
+      //   })
+      // })
+      // console.log(mintRequest);
+
+      // const mintResult = await mintRequest.text();
+      // console.log(mintResult);
+      const uri = `ipfs://${result.metadataCid}`
+      const signature = await mintPhotoNFT(file.name, uri);
+
     } catch (e) {
       console.log(e);
       setUploading(false);

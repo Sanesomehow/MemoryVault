@@ -28,8 +28,11 @@ export async function POST(request: NextRequest) {
     const metadata = {
       name: name,
       description: "Encrypted photo from MemoryVault",
+      symbol: "MVLT",
       image: `ipfs://${cid}`,
+      seller_fee_basis_points: 0,
       properties: {
+        "files": [{ "uri": `ipfs://${cid}`, "type": "image/png" }],
         encrypted_content_cid: cid,
         encryption_params: {
           iv: ivString,
