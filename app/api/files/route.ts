@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { pinata } from "@/utils/pinata-config"
+import { pinata } from "@/lib/pinata-config"
 
 export async function POST(request: NextRequest) {
 
@@ -32,7 +32,10 @@ export async function POST(request: NextRequest) {
       image: `ipfs://${cid}`,
       seller_fee_basis_points: 0,
       properties: {
-        "files": [{ "uri": `ipfs://${cid}`, "type": "image/png" }],
+        files: [{ uri: `ipfs://${cid}`, type: "image/png" }],
+        category: "image", 
+        creators: [], 
+        app: "MemoryVault",
         encrypted_content_cid: cid,
         encryption_params: {
           iv: ivString,

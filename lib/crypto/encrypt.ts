@@ -1,4 +1,4 @@
-import { pinata } from "@/utils/pinata-config";
+import { pinata } from "@/lib/pinata-config";
 import { subtle } from "crypto";
 import { decryptAESKey } from "./keyEncryption";
 

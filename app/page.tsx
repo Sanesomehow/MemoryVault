@@ -7,7 +7,9 @@ import { encryptAESKey } from "@/lib/crypto/keyEncryption";
 import { useWallet, WalletProvider } from "@solana/wallet-adapter-react";
 import nacl from "tweetnacl";
 import React, { useEffect, useState } from "react";
-import { mintPhotoNFT } from "@/lib/metaplex/umiMint";
+import { mintPhotoNFT } from "@/lib/nft/nftMint";
+import { usesToggle } from "@metaplex-foundation/mpl-token-metadata";
+import { Gallary } from "../components/gallary";
 
 export default function Home() {
   const [file, setFile] = useState<File>();
@@ -18,8 +20,12 @@ export default function Home() {
   }>();
   const [uploading, setUploading] = useState(false);
   const [displayUrl, setDisplayUrl] = useState<string>();
+  const [NftMints, setNftMints] = useState<string[]>([]);
 
-  const { connected, signMessage, publicKey } = useWallet();
+
+  const wallet = useWallet()
+
+  const { connected, signMessage, publicKey } = wallet;
 
   const uploadFile = async () => {
     try {
@@ -27,7 +33,7 @@ export default function Home() {
         alert("No file selected");
         return;
       }
-      if (!connected || !signMessage || !publicKey) {
+      if (!connected || !signMessage || !publicKey || !wallet) {
         alert("wallet connection error");
         return;
       }
@@ -36,7 +42,7 @@ export default function Home() {
 
       const { encFile, keyArray, IV } = await Encrypt(file);
 
-      const { encrypted: encryptedKey, nonce } = await encryptAESKey(
+      const { encrypted: encryptedKey, nonce } = encryptAESKey(
         keyArray,
         publicKey.toBytes()
       );
@@ -80,8 +86,13 @@ export default function Home() {
 
       // const mintResult = await mintRequest.text();
       // console.log(mintResult);
-      const uri = `ipfs://${result.metadataCid}`
-      const signature = await mintPhotoNFT(file.name, uri);
+      const uri = `ipfs://${result.metadataCid}`;
+      const { signature, mintAddress } = await mintPhotoNFT(file.name, uri, wallet);
+
+      console.log("Transaction:", signature);
+      console.log("NFT Mint Address:", mintAddress);
+
+      setNftMints(prev => [...prev, mintAddress]);
 
     } catch (e) {
       console.log(e);
@@ -113,7 +124,7 @@ export default function Home() {
       console.log("Photo decrypted successfully.");
       setDisplayUrl(displayUrl);
       console.log("Decrypted message url: ", displayUrl);
-    } catch (e) { 
+    } catch (e) {
       console.error("Decryption failed:", e);
       alert("Failed to decrypt photo: " + (e as Error).message);
     }
@@ -157,6 +168,11 @@ export default function Home() {
           <img src={displayUrl} alt="" />
         </div>
       )}
+      {publicKey ? <Gallary publicKey={publicKey} /> : <div>
+        <p>Please connect your wallet to view NFTs.</p>
+      </div> }
+
+
     </main>
   );
 }
