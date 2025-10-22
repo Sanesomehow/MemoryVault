@@ -39,29 +39,23 @@ export async function Encrypt(file: File) {
 }
 
 export async function decryptPhoto({
-    url, 
-    cid, 
-    metadataCid, 
-    publicKey
+    encryptedContentCid,
+    publicKey,
+    encryptionParams,
+    encryptedKey,
+    fileType
 }: {
-    url: string, 
-    cid: string, 
-    metadataCid: string, 
-    publicKey: Uint8Array
+    encryptedContentCid: string,
+    publicKey: Uint8Array,
+    encryptionParams: { iv: string; nonce: string },
+    encryptedKey: string,
+    fileType: string
 }) {
-    const metadataUrl = `https://${gatewayUrl}/ipfs/${metadataCid}`;
-    const metadataRes = await fetch(metadataUrl);
-    const metadata = await metadataRes.json();
-    
-    const encryptedContentCid = metadata.properties.encrypted_content_cid;
-    const ivBase64 = metadata.properties.encryption_params.iv;
-    const nonce = metadata.properties.encryption_params.nonce;
-    const encryptedKey = metadata.properties.owner_encrypted_key;
+    console.log("🧩 decryptPhoto() called");
 
+    const { iv: ivBase64, nonce } = encryptionParams;
     const aesKeyArray = decryptAESKey(encryptedKey, nonce, publicKey);
-    if(!aesKeyArray) {
-        throw new Error("Failed to decrypt AES key");
-    }
+    if (!aesKeyArray) throw new Error("Failed to decrypt AES key");
 
     const aesKey = await window.crypto.subtle.importKey(
         'raw',
@@ -72,9 +66,11 @@ export async function decryptPhoto({
     );
 
     const imageUrl = `https://${gatewayUrl}/ipfs/${encryptedContentCid}`;
+    console.log("📦 Fetching encrypted image from:", imageUrl);
     const encryptedResponse = await fetch(imageUrl);
-    const encryptedBuffer = await encryptedResponse.arrayBuffer();
+    if (!encryptedResponse.ok) throw new Error("Failed to fetch encrypted content");
 
+    const encryptedBuffer = await encryptedResponse.arrayBuffer();
     const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
 
     const decryptedBuffer = await window.crypto.subtle.decrypt(
@@ -83,8 +79,8 @@ export async function decryptPhoto({
         encryptedBuffer
     );
 
-    const blob = new Blob([decryptedBuffer], {type: "image/png"});
+    const blob = new Blob([decryptedBuffer], { type: fileType });
     const displayUrl = URL.createObjectURL(blob);
-
     return displayUrl;
 }
+

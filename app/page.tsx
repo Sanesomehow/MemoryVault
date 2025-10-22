@@ -6,10 +6,13 @@ import { decryptPhoto, Encrypt } from "@/lib/crypto/encrypt";
 import { encryptAESKey } from "@/lib/crypto/keyEncryption";
 import { useWallet, WalletProvider } from "@solana/wallet-adapter-react";
 import nacl from "tweetnacl";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { mintPhotoNFT } from "@/lib/nft/nftMint";
 import { usesToggle } from "@metaplex-foundation/mpl-token-metadata";
 import { Gallary } from "../components/gallary";
+import Link from "next/link";
+import {useDropzone} from 'react-dropzone'
+
 
 export default function Home() {
   const [file, setFile] = useState<File>();
@@ -39,6 +42,7 @@ export default function Home() {
       }
 
       setUploading(true);
+      const mimeType: string = file.type;
 
       const { encFile, keyArray, IV } = await Encrypt(file);
 
@@ -52,6 +56,7 @@ export default function Home() {
       const data = new FormData();
       data.set("file", encFile);
       data.set("name", file.name);
+      data.set("type", mimeType);
       data.set("iv", IV);
       data.set("size", file.size.toString());
       data.set("encryptedKey", encryptedKey);
@@ -68,6 +73,10 @@ export default function Home() {
 
       const result = await uploadRequest.json();
       console.log("upload request:", uploadRequest);
+      console.log("=== Upload Result ===");
+    console.log("Image CID:", result.cid);
+    console.log("Metadata CID:", result.metadataCid);
+    console.log("Are they different?", result.cid !== result.metadataCid);
       setResult(result);
       setUploading(false);
       alert("Photo uploaded successfully");
@@ -87,10 +96,14 @@ export default function Home() {
       // const mintResult = await mintRequest.text();
       // console.log(mintResult);
       const uri = `ipfs://${result.metadataCid}`;
+      console.log("=== Minting NFT ===");
+    console.log("URI being used:", uri);
       const { signature, mintAddress } = await mintPhotoNFT(file.name, uri, wallet);
 
       console.log("Transaction:", signature);
       console.log("NFT Mint Address:", mintAddress);
+
+      console.log("Verify on explorer:", `https://explorer.solana.com/address/${mintAddress}?cluster=devnet`);
 
       setNftMints(prev => [...prev, mintAddress]);
 
@@ -114,12 +127,10 @@ export default function Home() {
 
       console.log("Decrypting photo...");
 
-      const displayUrl = await decryptPhoto({
-        url: result.url,
-        cid: result.cid,
-        metadataCid: result.metadataCid,
-        publicKey: publicKey.toBytes(),
-      });
+      // const displayUrl = await decryptPhoto({
+      //   metadataCid: result.metadataCid,
+      //   publicKey: publicKey.toBytes(),
+      // });
 
       console.log("Photo decrypted successfully.");
       setDisplayUrl(displayUrl);
@@ -128,10 +139,6 @@ export default function Home() {
       console.error("Decryption failed:", e);
       alert("Failed to decrypt photo: " + (e as Error).message);
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFile(e.target?.files?.[0]);
   };
 
   return (
@@ -148,11 +155,15 @@ export default function Home() {
           <p>Please connect your wallet to upload photos.</p>
         </div>
       )}
-      <input type="file" onChange={handleChange} />
+
+      <MyDropzone onFileSelected={setFile} />
+      <p>Supported formats: PNG, JPG/JPEG, HEIC, GIF, WEBP</p>
+
       <button
         type="button"
         disabled={uploading || !connected}
         onClick={uploadFile}
+        className="bg-green-300 p-2"
       >
         {uploading ? "Uploading..." : "Upload"}
       </button>
@@ -168,11 +179,29 @@ export default function Home() {
           <img src={displayUrl} alt="" />
         </div>
       )}
-      {publicKey ? <Gallary publicKey={publicKey} /> : <div>
+      {publicKey ?<Gallary publicKey={publicKey} /> : <div>
         <p>Please connect your wallet to view NFTs.</p>
       </div> }
 
-
     </main>
+  );
+}
+
+
+
+function MyDropzone({ onFileSelected }: { onFileSelected: (file: File) => void }) {
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      onFileSelected(acceptedFiles[0]);
+    }
+  }, [onFileSelected]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+  return (
+    <div {...getRootProps()} className="p-10 border border-dashed border-blue-500">
+      <input {...getInputProps()} />
+      {isDragActive ? <p>Drop the files here ...</p> : <p>Drag 'n' drop some files here, or click to select files</p>}
+    </div>
   );
 }

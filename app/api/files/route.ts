@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
     const data = await request.formData();
     const file: File | null = data.get("file") as unknown as File;
     const name: string = data.get('name')?.toString() ?? "";
+    const fileType: string = data.get('type')?.toString() ?? "image/png";
     const originalSize: string = data.get("size")?.toString() ?? "";
     const ivString = data.get("iv")?.toString() ?? "";
     const encryptedKey = data.get("encryptedKey")?.toString() ?? "";
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       image: `ipfs://${cid}`,
       seller_fee_basis_points: 0,
       properties: {
-        files: [{ uri: `ipfs://${cid}`, type: "image/png" }],
+        files: [{ uri: `ipfs://${cid}`, type: fileType }],
         category: "image", 
         creators: [], 
         app: "MemoryVault",

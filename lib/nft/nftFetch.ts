@@ -1,4 +1,4 @@
-import { fetchAllDigitalAssetByOwner, fetchDigitalAsset } from "@metaplex-foundation/mpl-token-metadata";
+import { fetchAllDigitalAssetByOwner, fetchDigitalAsset, fetchDigitalAssetWithAssociatedToken } from "@metaplex-foundation/mpl-token-metadata";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { PublicKey } from "@solana/web3.js";
 import { umi } from "../umi";
@@ -22,6 +22,7 @@ export async function fetchAllNft(publicKey: PublicKey) {
     console.log("Fetching NFTs for:", owner);
     
     const allNfts = await fetchAllDigitalAssetByOwner(umi, owner);
+    console.log("allNfts: ", allNfts);
     console.log("All NFTs found:", allNfts.length);
     
     const relatedNfts = await Promise.all(
@@ -66,11 +67,28 @@ export async function fetchSingleNft(publicKey: PublicKey, mintAddressString: st
     }
     
     const mintAddress = umiPublicKey(mintAddressString);
-    const nft = await fetchDigitalAsset(umi, mintAddress);
+    const nft = await fetchDigitalAssetWithAssociatedToken(umi, mintAddress, umiPublicKey(publicKey));
+    console.log("=== Fetch Single NFT ===");
+    console.log("NFT URI:", nft.metadata.uri);
     
-    const metadataUri = convertIpfsToHttp(nft.metadata.uri);
-    const response = await fetch(metadataUri);
+    const metadataUri = nft.metadata.uri;
+    const metadataCid = metadataUri.replace('ipfs://', '').split('/')[0];
+
+    console.log("Extracted metadata CID:", metadataCid);
+
+    const httpUri = convertIpfsToHttp(metadataUri);
+
+    console.log("Fetching from HTTP URI:", httpUri);
+    const response = await fetch(httpUri);
+
+    console.log("Response status:", response.status);
+    console.log("Response content-type:", response.headers.get('content-type'));
+
+    // const text = await response.text();
+    // console.log("Response preview:", text.substring(0, 200));
+
     const metadata = await response.json();
-    
-    return { nft, metadata };
+    console.log("Parsed metadata:", metadata);
+
+    return { nft, metadata, metadataCid };
 }

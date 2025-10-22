@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchAllNft } from "@/lib/nft/nftFetch";
 import { PublicKey } from "@solana/web3.js";
+import Link from "next/link";
 
 interface GallaryProps {
   publicKey: PublicKey;
@@ -34,7 +35,10 @@ export function Gallary({ publicKey }: GallaryProps) {
     <div>
       {nfts.map((nft, i) => (
         <div key={i}>
-          {nft.metadata?.name} — {nft.metadata?.symbol}
+          <Link href={`/gallery/${nft.mintAddress}`}>
+          <img src="/assets/image.png" alt="" />
+            {nft.metadata?.name} — {nft.metadata?.symbol}
+          </Link>
         </div>
       ))}
     </div>
