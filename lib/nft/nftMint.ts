@@ -21,6 +21,7 @@ export async function mintPhotoNFT(name: string, uri: string, wallet: WalletCont
         mint: nftSigner,
         sellerFeeBasisPoints: percentAmount(0),
         name: name,
+        symbol: "MVLT",
         uri: uri,
     }).sendAndConfirm(umi);
     

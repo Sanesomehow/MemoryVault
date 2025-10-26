@@ -62,33 +62,42 @@ export async function fetchAllNft(publicKey: PublicKey) {
 }
 
 export async function fetchSingleNft(publicKey: PublicKey, mintAddressString: string) {
-    if(!publicKey) {
-        throw new Error("Wallet not connected");
-    }
-    
-    const mintAddress = umiPublicKey(mintAddressString);
-    const nft = await fetchDigitalAssetWithAssociatedToken(umi, mintAddress, umiPublicKey(publicKey));
-    console.log("=== Fetch Single NFT ===");
-    console.log("NFT URI:", nft.metadata.uri);
-    
-    const metadataUri = nft.metadata.uri;
-    const metadataCid = metadataUri.replace('ipfs://', '').split('/')[0];
+  const mintAddress = umiPublicKey(mintAddressString);
 
-    console.log("Extracted metadata CID:", metadataCid);
+  // Fetch NFT metadata account directly (works for both owner & viewer)
+  const nft = await fetchDigitalAsset(umi, mintAddress);
 
-    const httpUri = convertIpfsToHttp(metadataUri);
+  // Convert IPFS URI
+  const httpUri = ipfsToHttp(nft.metadata.uri);
 
-    console.log("Fetching from HTTP URI:", httpUri);
-    const response = await fetch(httpUri);
+  // Fetch metadata JSON
+  const metadata = await fetch(httpUri).then(r => r.json());
 
-    console.log("Response status:", response.status);
-    console.log("Response content-type:", response.headers.get('content-type'));
+  // Optional: check if the connected user is the owner
+  const isOwner = publicKey ? await checkIfOwner(publicKey, mintAddressString) : false;
 
-    // const text = await response.text();
-    // console.log("Response preview:", text.substring(0, 200));
+  return { nft, metadata, metadataCid: extractCid(nft.metadata.uri), isOwner };
+}
 
-    const metadata = await response.json();
-    console.log("Parsed metadata:", metadata);
+function ipfsToHttp(uri: string) {
+  if (!uri) return "";
+  if (uri.startsWith("ipfs://")) {
+    const cid = uri.replace("ipfs://", "");
+    return `https://gateway.pinata.cloud/ipfs/${cid}`;
+  }
+  return uri; // Already HTTP(S)
+}
 
-    return { nft, metadata, metadataCid };
+async function checkIfOwner(publicKey: PublicKey, mintAddress: string) {
+  // Query associated token account balance
+  try {
+    const ata = await fetchDigitalAssetWithAssociatedToken(umi, umiPublicKey(mintAddress), umiPublicKey(publicKey));
+    return ata ? true : false;
+  } catch {
+    return false;
+  }
+}
+
+function extractCid(uri: string) {
+  return uri?.includes("ipfs://") ? uri.split("ipfs://")[1].split("/")[0] : null;
 }

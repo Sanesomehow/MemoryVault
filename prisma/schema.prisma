@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model SharedAccess {
+  id           String   @id @default(uuid())
+  ownerWallet  String
+  viewerWallet String
+  mintAddress  String
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+
+  @@index([viewerWallet])
+  @@index([ownerWallet])
+}
+
+model AccessRequest {
+  id              String   @id @default(uuid())
+  requesterWallet String
+  ownerWallet     String
+  mintAddress     String
+  nftName         String?
+  message         String?
+  status          String   @default("pending") // pending, approved, denied
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ownerWallet])
+  @@index([requesterWallet])
+  @@index([mintAddress])
+  @@unique([requesterWallet, mintAddress])
+}

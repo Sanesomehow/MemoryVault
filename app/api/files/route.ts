@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { pinata } from "@/lib/pinata-config"
+import { pinata } from "@/lib/pinata-config";
+import sharp from "sharp";
+import { encode } from "blurhash";
 
 export async function POST(request: NextRequest) {
 
@@ -18,6 +20,33 @@ export async function POST(request: NextRequest) {
         { error: "No file found" },
         { status: 400 }
       );
+    }
+
+    // Generate blur hash before encryption
+    let blurHash = "";
+    let imageWidth = 0;
+    let imageHeight = 0;
+    
+    try {
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      
+      // Get original image dimensions
+      const metadata = await sharp(fileBuffer).metadata();
+      imageWidth = metadata.width || 0;
+      imageHeight = metadata.height || 0;
+      
+      // Resize to 32x32 and get raw pixel data
+      const { data, info } = await sharp(fileBuffer)
+        .resize(32, 32, { fit: 'cover' })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      
+      // Generate blurhash
+      blurHash = encode(new Uint8ClampedArray(data), info.width, info.height, 4, 4);
+    } catch (error) {
+      console.error("Error generating blur hash:", error);
+      // Continue without blur hash if generation fails
     }
 
     const { cid } = await pinata.upload.public.file(file)
@@ -46,7 +75,10 @@ export async function POST(request: NextRequest) {
         owner_encrypted_key: encryptedKey,
         allowed_viewers: {},
         original_size: originalSize,
-        upload_date: new Date().toISOString()
+        upload_date: new Date().toISOString(),
+        blur_hash: blurHash,
+        blur_width: imageWidth,
+        blur_height: imageHeight
       }
     }
     const jsonString = JSON.stringify(metadata, null, 2);
