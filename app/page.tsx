@@ -6,6 +6,7 @@ import { encryptAESKey } from "@/lib/crypto/keyEncryption";
 import { generateBlurhash } from "@/lib/blurhash-generator";
 import { useWallet } from "@solana/wallet-adapter-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { mintPhotoNFT } from "@/lib/nft/nftMint";
 import { Gallary } from "../components/gallary";
 import LoadingSpinner from "@/components/ui/loading-spinner";
@@ -14,7 +15,7 @@ import PhotoPreviewCard from "@/components/photo-preview-card";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Upload, Check, ImageIcon, Shield, Zap, Lock, X } from "lucide-react";
+import { Loader2, Upload, Check, ImageIcon, Shield, Zap, Lock, X, ArrowRight, Share2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export default function Home() {
   } | null>(null);
 
   const wallet = useWallet();
+  const router = useRouter();
 
   const { connected, signMessage, publicKey } = wallet;
 
@@ -69,6 +71,15 @@ export default function Home() {
       console.error("Error fetching shared NFTs:", e);
     }
   };
+
+  // Check for first visit and redirect to onboarding
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('memoryVault_hasSeenOnboarding');
+    if (hasSeenOnboarding !== 'true') {
+      // Redirect to onboarding on first visit
+      router.push('/onboarding');
+    }
+  }, [router]);
 
   // Load shared NFTs when wallet connects
   useEffect(() => {
@@ -348,7 +359,7 @@ export default function Home() {
         encryptedKey: owner_encrypted_key,
         fileType: files[0].type
       });
-      
+
       console.log("Photo decrypted successfully.");
       setDisplayUrl(displayUrl);
       console.log("Decrypted message url: ", displayUrl);
@@ -396,6 +407,113 @@ export default function Home() {
             <span>Connect your wallet to get started</span>
           </div>
         )}
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-16 bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+              Three simple steps to secure your memories forever
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Step 1: Upload */}
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Upload className="h-10 w-10 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">1</span>
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Upload Your Photo</h3>
+              <p className="text-gray-600">
+                Select any photo from your device. We support PNG, JPG, HEIC, GIF, and WebP formats up to 50MB.
+              </p>
+              <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+                <ImageIcon className="h-4 w-4" />
+                <span>All formats supported</span>
+              </div>
+            </div>
+
+            {/* Arrow 1 */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="flex items-center">
+                <div className="w-16 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400"></div>
+                <ArrowRight className="h-6 w-6 text-purple-500 ml-2" />
+              </div>
+            </div>
+
+            {/* Step 2: Encrypt */}
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Lock className="h-10 w-10 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 font-bold text-sm">2</span>
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Encrypt & Store</h3>
+              <p className="text-gray-600">
+                Your photo is encrypted on your device using your wallet's keys, then stored on IPFS and minted as an NFT.
+              </p>
+              <div className="inline-flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm">
+                <Shield className="h-4 w-4" />
+                <span>End-to-end encrypted</span>
+              </div>
+            </div>
+
+            {/* Arrow 2 */}
+            <div className="hidden md:flex items-center justify-center">
+              <div className="flex items-center">
+                <div className="w-16 h-0.5 bg-gradient-to-r from-purple-400 to-green-400"></div>
+                <ArrowRight className="h-6 w-6 text-green-500 ml-2" />
+              </div>
+            </div>
+
+            {/* Step 3: Share */}
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Share2 className="h-10 w-10 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 font-bold text-sm">3</span>
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Share Securely</h3>
+              <p className="text-gray-600">
+                Share your encrypted photos with friends while maintaining full control. Only you decide who can see them.
+              </p>
+              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                <Zap className="h-4 w-4" />
+                <span>Your keys, your control</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom CTA */}
+          <div className="text-center mt-12 space-y-4">
+            <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm border border-white/20 rounded-lg p-4">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <span className="text-gray-700 font-medium">Zero-knowledge privacy guaranteed</span>
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/onboarding')}
+                className="text-sm bg-white/80 hover:bg-white"
+              >
+                View Tutorial Again
+              </Button>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Upload Section */}
