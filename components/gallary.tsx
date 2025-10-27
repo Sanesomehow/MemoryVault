@@ -19,12 +19,13 @@ import Link from "next/link";
 interface GallaryProps {
   publicKey: PublicKey;
   sharedNfts?: any[];
+  refresh?: number;
 }
 
 type SortOption = "date-newest" | "date-oldest" | "name-asc" | "name-desc" | "size-asc" | "size-desc";
 type TabType = "owned" | "shared";
 
-export function Gallary({ publicKey, sharedNfts = [] }: GallaryProps) {
+export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
   const [ownedNfts, setOwnedNfts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("owned");
@@ -47,7 +48,7 @@ export function Gallary({ publicKey, sharedNfts = [] }: GallaryProps) {
     if (publicKey) {
       loadNFTs();
     }
-  }, [publicKey]);
+  }, [publicKey, refresh]);
 
   const currentNfts = activeTab === "owned" ? ownedNfts : sharedNfts;
 
@@ -247,7 +248,7 @@ export function Gallary({ publicKey, sharedNfts = [] }: GallaryProps) {
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg">
               {sortOptions.map((option) => (
                 <DropdownMenuItem
                   key={option.value}
@@ -264,52 +265,65 @@ export function Gallary({ publicKey, sharedNfts = [] }: GallaryProps) {
       {/* Photo Grid */}
       {filteredAndSortedNfts.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredAndSortedNfts.map((nft, i) => (
-            <Card key={`${nft.mintAddress}-${i}`} className="group overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-              <CardContent className="p-0">
-                <Link href={`/gallery/${nft.mintAddress}`} className="block">
-                  {/* Image Container */}
-                  <div className="relative aspect-square overflow-hidden rounded-lg">
-                    <BlurhashImage
-                      blurHash={nft.metadata?.properties?.blur_hash}
-                      width={nft.metadata?.properties?.blur_width}
-                      height={nft.metadata?.properties?.blur_height}
-                      src={getImageUrl()}
-                      alt={nft.metadata?.name || "NFT Photo"}
-                      className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                    />
-                    
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <div className="text-center text-white space-y-3">
-                        <h3 className="font-semibold text-lg">
-                          {nft.metadata?.name || "Untitled Photo"}
-                        </h3>
-                        <Button size="sm" variant="secondary">
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Photo
-                        </Button>
-                        <p className="text-white/80 text-sm">
-                          <Calendar className="h-3 w-3 inline mr-1" />
-                          {formatDate(nft.metadata?.properties?.upload_date)}
-                        </p>
+          {filteredAndSortedNfts.map((nft, i) => {
+            // Log NFT metadata for debugging
+            console.log(`NFT ${i} metadata:`, {
+              mintAddress: nft.mintAddress,
+              name: nft.metadata?.name,
+              properties: nft.metadata?.properties,
+              blurHash: nft.metadata?.properties?.blur_hash,
+              blurWidth: nft.metadata?.properties?.blur_width,
+              blurHeight: nft.metadata?.properties?.blur_height,
+              fullMetadata: nft.metadata
+            });
+
+            return (
+              <Card key={`${nft.mintAddress}-${i}`} className="group overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
+                <CardContent className="p-0">
+                  <Link href={`/gallery/${nft.mintAddress}`} className="block">
+                    {/* Image Container */}
+                    <div className="relative aspect-square overflow-hidden rounded-lg">
+                      <BlurhashImage
+                        blurHash={nft.metadata?.properties?.blur_hash}
+                        width={nft.metadata?.properties?.blur_width}
+                        height={nft.metadata?.properties?.blur_height}
+                        // src={getImageUrl()}
+                        alt={nft.metadata?.name || "NFT Photo"}
+                        className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                      />
+                      
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                        <div className="text-center text-white space-y-3">
+                          <h3 className="font-semibold text-lg">
+                            {nft.metadata?.name || "Untitled Photo"}
+                          </h3>
+                          <Button size="sm" variant="secondary">
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Photo
+                          </Button>
+                          <p className="text-white/80 text-sm">
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            {formatDate(nft.metadata?.properties?.upload_date)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Card Footer */}
-                  <div className="p-4 space-y-2">
-                    <h3 className="font-medium text-gray-900 truncate">
-                      {nft.metadata?.name || "Untitled Photo"}
-                    </h3>
-                    <p className="text-gray-500 text-sm">
-                      {formatDate(nft.metadata?.properties?.upload_date)}
-                    </p>
-                  </div>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+                    
+                    {/* Card Footer */}
+                    <div className="p-4 space-y-2">
+                      <h3 className="font-medium text-gray-900 truncate">
+                        {nft.metadata?.name || "Untitled Photo"}
+                      </h3>
+                      <p className="text-gray-500 text-sm">
+                        {formatDate(nft.metadata?.properties?.upload_date)}
+                      </p>
+                    </div>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <EmptyState type={activeTab} />

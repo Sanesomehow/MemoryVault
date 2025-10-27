@@ -7,22 +7,58 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const { metadata, viewerWallet, mintAddress, owner } = await request.json();
-    console.log(metadata);
+    console.log("Received update request:", { viewerWallet, mintAddress, owner });
 
+    // Validate required fields
+    if (!metadata) {
+      throw new Error("Metadata is required");
+    }
+
+    if (!mintAddress) {
+      throw new Error("Mint address is required");
+    }
+
+    if (!owner) {
+      throw new Error("Owner wallet address is required");
+    }
+
+    // Upload metadata to IPFS
     const jsonString = JSON.stringify(metadata, null, 2);
     const metadataFile = new File([jsonString], "metadata.json", { type: "application/json" });
 
     const { cid: metadataCid } = await pinata.upload.public.file(metadataFile);
+    console.log("Metadata uploaded to IPFS:", metadataCid);
 
+    // Create database record if viewer and mint address are provided
     if (viewerWallet && mintAddress) {
-      await prisma.sharedAccess.create({
-        data: {
-          ownerWallet: owner, // or nftData.nft.token.owner
-          viewerWallet: viewerWallet,
-          mintAddress: mintAddress,
-          status: "active",
-        },
-      });
+      try {
+        // Check if record already exists to avoid duplicates
+        const existing = await prisma.sharedAccess.findFirst({
+          where: {
+            ownerWallet: owner,
+            viewerWallet: viewerWallet,
+            mintAddress: mintAddress,
+          }
+        });
+
+        if (!existing) {
+          const sharedAccess = await prisma.sharedAccess.create({
+            data: {
+              ownerWallet: owner,
+              viewerWallet: viewerWallet,
+              mintAddress: mintAddress,
+              status: "active",
+            },
+          });
+          console.log("Database record created:", sharedAccess);
+        } else {
+          console.log("Database record already exists, skipping creation");
+        }
+      } catch (dbError: any) {
+        console.error("Database error:", dbError);
+        // Continue with the response even if DB operation fails
+        // The NFT update is more important than the DB record
+      }
     }
 
     return NextResponse.json({
@@ -31,10 +67,14 @@ export async function POST(request: NextRequest) {
       metadataCid
     }, { status: 200 });
 
-  } catch (e) {
-    console.log(e);
+  } catch (e: any) {
+    console.error("API Error:", e);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { 
+        error: "Internal Server Error",
+        details: e.message,
+        stack: process.env.NODE_ENV === "development" ? e.stack : undefined
+      },
       { status: 500 }
     );
   }

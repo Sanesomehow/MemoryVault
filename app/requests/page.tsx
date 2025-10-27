@@ -216,7 +216,7 @@ export default function RequestsPage() {
             <div className="flex gap-3">
               <Button
                 onClick={() => handleBulkAction("approve")}
-                className="gap-2 hover:scale-[1.02] transition-all duration-200"
+                className="gap-2 border border-black-300 hover:scale-[1.02] transition-all duration-200"
               >
                 <Check className="h-4 w-4" />
                 Approve All ({pendingRequests.length})
@@ -341,18 +341,30 @@ function RequestCard({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Approved</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+            Approved
+          </span>
+        );
       case 'denied':
-        return <Badge variant="destructive">Denied</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+            Denied
+          </span>
+        );
       default:
-        return <Badge variant="secondary">Pending</Badge>;
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+            Pending
+          </span>
+        );
     }
   };
 
   return (
     <Card className="hover:shadow-lg transition-all duration-200">
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-4">
+      <CardContent className="p-6">
+        <div className="flex items-start gap-4">
           {/* Photo Thumbnail */}
           <div className="w-24 h-24 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
             <div className="w-8 h-8 bg-gray-400 rounded" />
@@ -360,8 +372,8 @@ function RequestCard({
 
           {/* Info Section */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-2">
-              <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 truncate">
                   {request.nftName || "Untitled Photo"}
                 </h3>
@@ -372,7 +384,9 @@ function RequestCard({
                   <span>{timeAgo(request.createdAt)}</span>
                 </div>
               </div>
-              {getStatusBadge(request.status)}
+              <div className="flex-shrink-0 ml-4 flex items-center">
+                {getStatusBadge(request.status)}
+              </div>
             </div>
 
             {/* Message */}
@@ -392,7 +406,7 @@ function RequestCard({
               <Button
                 onClick={onApprove}
                 disabled={isProcessing}
-                className="gap-2 hover:scale-[1.02] transition-all duration-200 disabled:hover:scale-100"
+                className="gap-2 border border-black-300 hover:scale-[1.02] transition-all duration-200 disabled:hover:scale-100"
               >
                 {isProcessing ? (
                   <LoadingSpinner size="sm" />

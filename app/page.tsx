@@ -3,6 +3,7 @@
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { decryptPhoto, Encrypt } from "@/lib/crypto/encrypt";
 import { encryptAESKey } from "@/lib/crypto/keyEncryption";
+import { generateBlurhash } from "@/lib/blurhash-generator";
 import { useWallet } from "@solana/wallet-adapter-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { mintPhotoNFT } from "@/lib/nft/nftMint";
@@ -165,6 +166,18 @@ export default function Home() {
         setLoadingState("encrypting");
         const mimeType: string = file.type;
 
+        // Generate blurhash before encryption
+        let blurhashData = null;
+        try {
+          console.log('Generating blurhash for file:', file.name);
+          blurhashData = await generateBlurhash(file);
+          console.log('Blurhash generated successfully:', blurhashData);
+        } catch (error) {
+          console.error('Failed to generate blurhash:', error);
+          // Continue without blurhash if generation fails
+          blurhashData = { blurHash: '', width: 0, height: 0 };
+        }
+
         // 1) Encrypt locally
         const { encFile, keyArray, IV } = await Encrypt(file);
 
@@ -186,6 +199,17 @@ export default function Home() {
         data.set("size", file.size.toString());
         data.set("encryptedKey", encryptedKey);
         data.set("nonce", nonce);
+        
+        // Add blurhash data to form
+        data.set("blurHash", blurhashData.blurHash);
+        data.set("imageWidth", blurhashData.width.toString());
+        data.set("imageHeight", blurhashData.height.toString());
+
+        console.log('Sending blurhash data to API:', {
+          blurHash: blurhashData.blurHash,
+          imageWidth: blurhashData.width,
+          imageHeight: blurhashData.height
+        });
 
         const uploadRequest = await fetch("/api/files", {
           method: "POST",
@@ -301,11 +325,30 @@ export default function Home() {
 
       console.log("Decrypting photo...");
 
-      // const displayUrl = await decryptPhoto({
-      //   metadataCid: result.metadataCid,
-      //   publicKey: publicKey.toBytes(),
-      // });
+      const metadataUrl = `https://${process.env.NEXT_PUBLIC_GATEWAY_URL}/ipfs/${result.metadataCid}`;
+      const metadataResponse = await fetch(metadataUrl);
+      if (!metadataResponse.ok) {
+        throw new Error("Failed to fetch metadata");
+      }
+      
+      const metadata = await metadataResponse.json();
+      console.log("Fetched metadata:", metadata);
+      
+      const {
+        encrypted_content_cid,
+        encryption_params,
+        owner_encrypted_key,
+        files
+      } = metadata.properties;
 
+      const displayUrl = await decryptPhoto({
+        encryptedContentCid: encrypted_content_cid,
+        publicKey: publicKey.toBytes(),
+        encryptionParams: encryption_params,
+        encryptedKey: owner_encrypted_key,
+        fileType: files[0].type
+      });
+      
       console.log("Photo decrypted successfully.");
       setDisplayUrl(displayUrl);
       console.log("Decrypted message url: ", displayUrl);
@@ -423,49 +466,62 @@ export default function Home() {
 
                     {/* Upload Button */}
                     <div className="space-y-4">
-                      <Button
-                        onClick={uploadFile}
-                        disabled={loadingState !== "idle"}
-                        className={cn(
-                          "w-full transition-all border border-black-500 duration-200 hover:scale-105 hover:shadow-lg",
-                          loadingState === "encrypting" && "animate-pulse bg-blue-600",
-                          loadingState === "uploading" && "animate-pulse bg-purple-600",
-                          loadingState === "minting" && "animate-pulse bg-green-600",
-                          loadingState === "complete" && "bg-green-600 animate-bounce"
-                        )}
-                        size="lg"
-                      >
-                        {loadingState === "idle" && (
-                          <>
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload & Mint NFT
-                          </>
-                        )}
-                        {loadingState === "encrypting" && (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Encrypting...
-                          </>
-                        )}
-                        {loadingState === "uploading" && (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Uploading to IPFS...
-                          </>
-                        )}
-                        {loadingState === "minting" && (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Minting NFT...
-                          </>
-                        )}
-                        {loadingState === "complete" && (
-                          <>
-                            <Check className="h-4 w-4 mr-2" />
-                            Success! ✓
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={uploadFile}
+                          disabled={loadingState !== "idle"}
+                          className={cn(
+                            "flex-1 transition-all border border-black-500 duration-200 hover:scale-105 hover:shadow-lg",
+                            loadingState === "encrypting" && "animate-pulse bg-blue-600",
+                            loadingState === "uploading" && "animate-pulse bg-purple-600",
+                            loadingState === "minting" && "animate-pulse bg-green-600",
+                            loadingState === "complete" && "bg-green-600 animate-bounce"
+                          )}
+                          size="lg"
+                        >
+                          {loadingState === "idle" && (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload & Mint NFT
+                            </>
+                          )}
+                          {loadingState === "encrypting" && (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Encrypting...
+                            </>
+                          )}
+                          {loadingState === "uploading" && (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Uploading to IPFS...
+                            </>
+                          )}
+                          {loadingState === "minting" && (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Minting NFT...
+                            </>
+                          )}
+                          {loadingState === "complete" && (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Success! ✓
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={handleRemoveFile}
+                          disabled={loadingState !== "idle"}
+                          className="transition-all duration-200 bg-red-400 text-white border-red-100 hover:scale-105 hover:shadow-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                          aria-label="Remove photo and select new one"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
 
                       {/* Progress Indicator */}
                       {loadingState !== "idle" && (
@@ -527,7 +583,7 @@ export default function Home() {
         </div>
 
         {publicKey ? (
-          <Gallary key={refresh} publicKey={publicKey} sharedNfts={sharedNfts} />
+          <Gallary key={refresh} publicKey={publicKey} sharedNfts={sharedNfts} refresh={refresh} />
         ) : (
           <Card className="max-w-md mx-auto">
             <CardContent className="text-center py-12">

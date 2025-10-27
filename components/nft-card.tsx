@@ -59,7 +59,6 @@ export function NFTCard({ nft, type, className }: NFTCardProps) {
             blurHash={nft.metadata?.properties?.blur_hash}
             width={nft.metadata?.properties?.blur_width}
             height={nft.metadata?.properties?.blur_height}
-            src={getImageUrl()}
             alt={nft.metadata?.name || "NFT Photo"}
             containerClassName="aspect-square"
             className="rounded-lg"

@@ -13,11 +13,20 @@ function ipfsToHttp(uri: string) {
   return uri;
 }
 
-// Helper: Fetch metadata JSON safely
-async function fetchMetadata(metadataUri: string) {
+// Helper: Fetch metadata JSON safely with timeout
+async function fetchMetadata(metadataUri: string, timeoutMs = 5000) {
   try {
     const httpUri = ipfsToHttp(metadataUri);
-    const response = await fetch(httpUri);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    const response = await fetch(httpUri, { 
+      signal: controller.signal,
+      cache: 'force-cache' // Cache responses to improve performance
+    });
+    clearTimeout(timeoutId);
+    
     if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
     return await response.json();
   } catch (err) {
@@ -33,55 +42,92 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing wallet address" }, { status: 400 });
     }
 
-    // Step 1: Get all active shared NFTs for this viewer
+    // Step 1: Get all active shared NFTs for this viewer (limit to recent 50)
     const sharedRecords = await prisma.sharedAccess.findMany({
       where: {
         viewerWallet: walletAddress,
         status: "active",
       },
       orderBy: { createdAt: "desc" },
+      take: 50, // Limit results to prevent performance issues
+      select: {
+        mintAddress: true,
+        ownerWallet: true,
+        createdAt: true,
+      }
     });
 
     if (!sharedRecords.length) {
       return NextResponse.json({ sharedNfts: [] });
     }
 
-    // Step 2: Fetch metadata for each NFT
-    const sharedNfts = [];
-    for (const record of sharedRecords) {
-      try {
-        const heliusRpc = `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
-        const heliusRes = await fetch(heliusRpc, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: record.mintAddress,
-            method: "getAsset",
-            params: { id: record.mintAddress },
-          }),
-        });
+    // Step 2: Batch fetch NFT data using Helius bulk API
+    const mintAddresses = sharedRecords.map(r => r.mintAddress);
+    
+    if (!process.env.HELIUS_API_KEY) {
+      console.warn("HELIUS_API_KEY not configured, falling back to limited data");
+      // Return basic data without Helius metadata
+      const sharedNfts = sharedRecords.map(record => ({
+        mintAddress: record.mintAddress,
+        name: `NFT ${record.mintAddress.slice(0, 8)}...`,
+        image: null,
+        description: "",
+        ownerWallet: record.ownerWallet,
+        createdAt: record.createdAt,
+      }));
+      return NextResponse.json({ sharedNfts });
+    }
+    
+    const heliusRpc = `https://devnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`;
+    const heliusRes = await fetch(heliusRpc, {
+      method: "POST", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "bulk-request",
+        method: "getAssetBatch",
+        params: { ids: mintAddresses },
+      }),
+    });
 
-        const heliusData = await heliusRes.json();
-        const nft = heliusData.result;
+    if (!heliusRes.ok) {
+      throw new Error(`Helius API failed: ${heliusRes.status}`);
+    }
+
+    const heliusData = await heliusRes.json();
+    const nfts = heliusData.result || [];
+
+    // Step 3: Parallel fetch of metadata
+    const metadataPromises = nfts.map(async (nft: any, index: number) => {
+      try {
+        const record = sharedRecords.find(r => r.mintAddress === nft.id);
+        if (!record) return null;
 
         const metadataUri = nft?.content?.json_uri;
         const metadata = metadataUri ? await fetchMetadata(metadataUri) : null;
 
         if (metadata) {
-          sharedNfts.push({
+          return {
             mintAddress: record.mintAddress,
             name: metadata.name,
             image: metadata.image,
             description: metadata.description || "",
             ownerWallet: record.ownerWallet,
             metadataCid: metadataUri,
-          });
+            metadata: metadata, // Include full metadata for thumbnails
+            createdAt: record.createdAt,
+          };
         }
+        return null;
       } catch (err) {
-        console.warn(`Failed to fetch metadata for ${record.mintAddress}`, err);
+        console.warn(`Failed to fetch metadata for ${nft?.id}`, err);
+        return null;
       }
-    }
+    });
+
+    // Wait for all metadata fetches to complete
+    const results = await Promise.all(metadataPromises);
+    const sharedNfts = results.filter(Boolean);
 
     // Step 3: Return data
     return NextResponse.json({ sharedNfts });

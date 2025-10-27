@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { decode } from "blurhash";
 import { cn } from "@/lib/utils";
-import { ImageIcon, Loader2 } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 
 interface BlurhashImageProps {
   blurHash?: string;
   width?: number;
   height?: number;
-  src: string;
+  src?: string;
   alt: string;
   className?: string;
   containerClassName?: string;
@@ -25,105 +25,190 @@ export function BlurhashImage({
   containerClassName
 }: BlurhashImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [canvasReady, setCanvasReady] = useState(false);
+  const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
 
-  // Generate blurhash canvas
+  // Canvas ref callback
+  const canvasRefCallback = (element: HTMLCanvasElement | null) => {
+    canvasRef.current = element;
+    setCanvasElement(element);
+    console.log('Canvas ref callback called with element:', !!element);
+  };
+
+  // Log received props
   useEffect(() => {
-    if (!blurHash || !canvasRef.current) {
-      setCanvasReady(true); // Skip blurhash if not available
+    console.log('BlurhashImage props received:', {
+      blurHash,
+      blurHashLength: blurHash?.length,
+      width,
+      height,
+      src,
+      alt,
+      hasBlurHash: !!blurHash,
+      hasSrc: !!src
+    });
+  }, [blurHash, width, height, src, alt]);
+
+  // Generate blurhash canvas - use simpler timeout approach
+  useEffect(() => {
+    console.log('BlurhashImage useEffect triggered:', { 
+      hasBlurHash: !!blurHash, 
+      hasCanvas: !!canvasRef.current,
+      blurHashValue: blurHash,
+      blurHashLength: blurHash?.length,
+      isValidBlurHash: blurHash && blurHash.length > 0
+    });
+
+    if (!blurHash || blurHash.trim() === '') {
+      console.log('Skipping blurhash rendering - no valid blurhash');
+      setCanvasReady(true);
       return;
     }
 
-    try {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    // Use a simple timeout to wait for canvas to be ready
+    const timeout = setTimeout(() => {
+      const canvas = canvasRef.current || canvasElement;
+      if (!canvas) {
+        console.log('Canvas ref not available after timeout');
+        setCanvasReady(true);
+        return;
+      }
 
-      // Set canvas size
-      canvas.width = 32;
-      canvas.height = 32;
+      console.log('Canvas ref available, starting blurhash rendering');
 
-      // Decode blurhash and draw to canvas
-      const pixels = decode(blurHash, 32, 32);
-      const imageData = new ImageData(new Uint8ClampedArray(pixels), 32, 32);
-      ctx.putImageData(imageData, 0, 0);
-      
-      setCanvasReady(true);
-    } catch (error) {
-      console.error('Error decoding blurhash:', error);
-      setCanvasReady(true); // Continue without blurhash
-    }
-  }, [blurHash]);
+      try {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          console.error('Failed to get canvas context');
+          setCanvasReady(true);
+          return;
+        }
 
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-    setImageError(false);
-  };
+        // Set canvas size to higher resolution for better quality
+        canvas.width = 64;
+        canvas.height = 64;
+        console.log('Canvas size set to 64x64');
 
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(false);
-  };
+        // Decode blurhash and draw to canvas
+        console.log('Decoding blurhash:', blurHash);
+        
+        try {
+          const pixels = decode(blurHash, 64, 64);
+          console.log('Blurhash decoded, pixels length:', pixels.length);
+          
+          // Validate pixels array
+          if (!pixels || pixels.length === 0) {
+            throw new Error('No pixels returned from blurhash decode');
+          }
+          
+          const imageData = new ImageData(new Uint8ClampedArray(pixels), 64, 64);
+          ctx.putImageData(imageData, 0, 0);
+          console.log('Image data applied to canvas successfully');
+          
+        } catch (decodeError) {
+          console.error('Blurhash decode failed:', decodeError);
+          // Fallback: draw a simple colored rectangle for debugging
+          ctx.fillStyle = '#3B82F6'; // Blue color for debugging
+          ctx.fillRect(0, 0, 64, 64);
+          console.log('Applied fallback blue color to canvas');
+        }
+        
+        setCanvasReady(true);
+        console.log('Canvas ready set to true');
+      } catch (error) {
+        console.error('Error decoding blurhash:', error);
+        console.error('BlurHash that failed:', blurHash);
+        setCanvasReady(true); // Continue without blurhash
+      }
+    }, 100); // Wait 100ms for canvas to be ready
+
+    return () => clearTimeout(timeout);
+  }, [blurHash, canvasElement]);
+
+  const shouldShowCanvas = blurHash && canvasReady && (!src || (!imageLoaded && !imageError));
+  const shouldShowFallback = !blurHash && !src;
+  
+  console.log('BlurhashImage render state:', { 
+    hasBlurHash: !!blurHash, 
+    canvasReady, 
+    shouldShowCanvas,
+    shouldShowFallback,
+    hasSrc: !!src,
+    imageLoaded,
+    imageError,
+    blurHashValue: blurHash?.substring(0, 10) + '...' // Show first 10 chars
+  });
 
   return (
     <div className={cn("relative overflow-hidden", containerClassName)}>
-      {/* Blurhash canvas - shown while image loads */}
-      {blurHash && canvasReady && !imageLoaded && (
+      {/* Blurhash canvas - shows as placeholder when no src or while image is loading */}
+      {shouldShowCanvas && (
         <canvas
-          ref={canvasRef}
+          ref={canvasRefCallback}
           className={cn(
-            "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
-            imageLoaded ? "opacity-0" : "opacity-100",
+            "w-full h-full object-cover",
             className
           )}
           style={{
-            filter: "blur(0.5px)",
-            transform: "scale(1.1)", // Slight scale to hide canvas edges
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            imageRendering: 'auto', // Better scaling quality
+            filter: 'blur(0.5px)', // Slight additional blur for smoother look
           }}
         />
       )}
 
-      {/* Fallback gray placeholder for images without blurhash */}
-      {!blurHash && !imageLoaded && !imageError && (
-        <div className={cn(
-          "absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center transition-opacity duration-300",
-          imageLoaded ? "opacity-0" : "opacity-100"
-        )}>
-          <div className="flex flex-col items-center justify-center text-gray-400">
-            <Loader2 className="w-8 h-8 animate-spin mb-2" />
-            <span className="text-sm">Loading...</span>
-          </div>
-        </div>
+      {/* Actual image - shows after loading */}
+      {src && (
+        <img
+          src={src}
+          alt={alt}
+          className={cn(
+            "w-full h-full object-cover transition-opacity duration-300",
+            imageLoaded ? "opacity-100" : "opacity-0",
+            className
+          )}
+          onLoad={() => {
+            console.log('Image loaded successfully');
+            setImageLoaded(true);
+            setImageError(false);
+          }}
+          onError={() => {
+            console.error('Image failed to load:', src);
+            setImageError(true);
+            setImageLoaded(false);
+          }}
+        />
       )}
 
-      {/* Error state */}
-      {imageError && (
+      {/* Fallback for no blurhash and no src */}
+      {!blurHash && !src && (
         <div className={cn(
-          "absolute inset-0 bg-gray-100 flex items-center justify-center",
+          "w-full h-full bg-gray-200 flex items-center justify-center",
           className
         )}>
           <div className="flex flex-col items-center justify-center text-gray-400">
             <ImageIcon className="w-12 h-12 mb-2" />
-            <span className="text-sm">Failed to load</span>
+            <span className="text-sm">No preview available</span>
           </div>
         </div>
       )}
 
-      {/* Actual image */}
-      <img
-        src={src}
-        alt={alt}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        className={cn(
-          "w-full h-full object-cover transition-opacity duration-300",
-          imageLoaded ? "opacity-100" : "opacity-0",
+      {/* Fallback for image error */}
+      {src && imageError && (
+        <div className={cn(
+          "w-full h-full bg-gray-200 flex items-center justify-center",
           className
-        )}
-        loading="lazy"
-      />
+        )}>
+          <div className="flex flex-col items-center justify-center text-gray-400">
+            <ImageIcon className="w-12 h-12 mb-2" />
+            <span className="text-sm">Failed to load image</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -361,7 +361,13 @@ function generateBlink() {
       });
 
       if (!updateRequest.ok) {
-        throw new Error("Update failed");
+        const errorData = await updateRequest.json().catch(() => ({}));
+        console.error("Update request failed:", {
+          status: updateRequest.status,
+          statusText: updateRequest.statusText,
+          errorData
+        });
+        throw new Error(`Update failed: ${errorData.details || updateRequest.statusText}`);
       }
 
       const result = await updateRequest.json();

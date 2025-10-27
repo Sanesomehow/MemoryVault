@@ -144,6 +144,7 @@ export function ShareAccessDialog({
                 )}
               </div>
 
+              {/* TODO: Implement time limit and view limit functionality
               <div className="space-y-2">
                 <label htmlFor="time-limit" className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <Timer className="h-4 w-4" />
@@ -179,6 +180,7 @@ export function ShareAccessDialog({
                 />
                 <p className="text-xs text-gray-500">Leave as 0 for unlimited views</p>
               </div>
+              */}
             </CardContent>
           </Card>
 
@@ -195,7 +197,7 @@ export function ShareAccessDialog({
               type="button"
               onClick={handleNext}
               disabled={!walletAddress.trim()}
-              className="flex-1 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 border border-black-300 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               Next
             </Button>
@@ -222,6 +224,7 @@ export function ShareAccessDialog({
                     {shortenAddress(walletAddress)}
                   </code>
                 </div>
+                {/* TODO: Implement time limit and view limit functionality
                 <div className="flex items-center justify-between py-2 border-b border-gray-200">
                   <span className="text-sm text-gray-600">Duration:</span>
                   <span className="text-sm font-medium">
@@ -238,6 +241,7 @@ export function ShareAccessDialog({
                     {viewLimit > 0 ? `${viewLimit} views` : "Unlimited"}
                   </span>
                 </div>
+                */}
               </div>
             </CardContent>
           </Card>
@@ -268,7 +272,7 @@ export function ShareAccessDialog({
               type="button"
               onClick={handleConfirm}
               disabled={isGranting}
-              className="flex-1 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
+              className="flex-1 border border-black-300 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
             >
               {isGranting ? (
                 <div className="flex items-center gap-2">

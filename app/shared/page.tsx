@@ -242,14 +242,25 @@ export default function SharedPhotos() {
             <Card className="overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <CardContent className="p-0">
                 <div className="relative overflow-hidden aspect-square">
-                  <BlurhashImage
-                    blurHash={nft.metadata?.properties?.blur_hash}
-                    width={nft.metadata?.properties?.blur_width}
-                    height={nft.metadata?.properties?.blur_height}
-                    src="/assets/image.png"
-                    alt={nft.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  />
+                  {nft.metadata?.properties?.blur_hash ? (
+                    <BlurhashImage
+                      blurHash={nft.metadata.properties.blur_hash}
+                      width={nft.metadata.properties.blur_width}
+                      height={nft.metadata.properties.blur_height}
+                      src={nft.image}
+                      alt={nft.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <img
+                      src={nft.image}
+                      alt={nft.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/assets/placeholder-image.svg';
+                      }}
+                    />
+                  )}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
                 </div>
                 <div className="p-4 space-y-3">
@@ -259,7 +270,7 @@ export default function SharedPhotos() {
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
                       <span className="block">Shared by:</span>
-                      <code className="text-xs">{shortenAddress(nft.owner || nft.metadata?.properties?.owner || "Unknown")}</code>
+                      <code className="text-xs">{shortenAddress(nft.ownerWallet || "Unknown")}</code>
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       Shared

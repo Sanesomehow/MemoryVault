@@ -73,7 +73,7 @@ export function WalletConnectButton() {
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
         <div className="px-2 py-1.5">
           <p className="text-sm font-medium">Wallet Connected</p>
           <p className="text-xs text-muted-foreground">

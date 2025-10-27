@@ -3,6 +3,21 @@ import { fetchSingleNft } from "@/lib/nft/nftFetch";
 import { Connection, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
 
+// CORS headers for Solana Actions
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Encoding, Accept-Encoding',
+  'Content-Type': 'application/json',
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 export async function GET(
   request: NextRequest, 
   { params }: { params: { mintAddress: string } }
@@ -15,42 +30,74 @@ export async function GET(
     if (!owner) {
       return NextResponse.json(
         { error: "Owner wallet address required" }, 
-        { status: 400 }
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
       );
     }
 
     // Fetch NFT metadata to display in Blink
     let metadata;
+    let imageUrl = "https://via.placeholder.com/400x400?text=Encrypted+Photo";
+    
     try {
       const ownerPubkey = new PublicKey(owner);
       const result = await fetchSingleNft(ownerPubkey, mintAddress);
       metadata = result.metadata;
+      
+      // Convert IPFS URL to HTTP if needed
+      if (metadata?.image) {
+        if (metadata.image.startsWith('ipfs://')) {
+          const cid = metadata.image.replace('ipfs://', '');
+          imageUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+        } else {
+          imageUrl = metadata.image;
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch NFT metadata:", error);
       // Continue anyway with fallback values
     }
 
-    // Return proper Solana Actions API format
-    return NextResponse.json({
-      icon: metadata?.image?.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') || 
-            "https://via.placeholder.com/400x400?text=Encrypted+Photo",
-      label: "Request Access",
+    const actionUrl = `${request.nextUrl.origin}/api/action/share/${mintAddress}?owner=${owner}`;
+    
+    const response = {
+      type: "action",
+      icon: imageUrl,
       title: metadata?.name || "Encrypted Photo",
-      description: `Request access to view this encrypted photo from ${owner.slice(0, 4)}...${owner.slice(-4)}`,
+      description: `Request access to view this encrypted photo shared by ${owner.slice(0, 4)}...${owner.slice(-4)}`,
+      label: "Request Access",
       links: {
         actions: [
           {
             label: "Request Access",
-            href: `/api/action/share/${mintAddress}?owner=${owner}`,
+            href: actionUrl,
+            type: "transaction"
           }
         ]
       }
+    };
+
+    console.log("Blink Action GET request:");
+    console.log("- Mint Address:", mintAddress);
+    console.log("- Owner:", owner);
+    console.log("- Action URL:", actionUrl);
+    console.log("- Image URL:", imageUrl);
+    console.log("- Metadata:", metadata ? "Found" : "Not found");
+    console.log("- Response:", JSON.stringify(response, null, 2));
+
+    return NextResponse.json(response, {
+      headers: corsHeaders
     });
   } catch (error) {
     console.error("GET /api/action/share error:", error);
     return NextResponse.json(
       { error: "Failed to load photo details" }, 
-      { status: 500 }
+        { 
+        status: 500,
+        headers: corsHeaders
+      }
     );
   }
 }
@@ -71,14 +118,14 @@ export async function POST(
     if (!viewerPublicKey) {
       return NextResponse.json(
         { error: "Viewer wallet address required" }, 
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
     if (!owner) {
       return NextResponse.json(
         { error: "Owner wallet address required" }, 
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -89,7 +136,7 @@ export async function POST(
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid wallet address format" }, 
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -109,7 +156,7 @@ export async function POST(
           error: "You already have a pending request for this photo",
           existingRequest: existingRequest 
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -186,13 +233,18 @@ export async function POST(
     return NextResponse.json({
       transaction: serializedTransaction.toString("base64"),
       message: `Access request sent to ${owner.slice(0, 4)}...${owner.slice(-4)}`,
+    }, {
+      headers: corsHeaders
     });
 
   } catch (error) {
     console.error("❌ POST /api/action/share error:", error);
     return NextResponse.json(
       { error: "Failed to create access request" }, 
-      { status: 500 }
+      { 
+        status: 500,
+        headers: corsHeaders
+      }
     );
   }
 }
