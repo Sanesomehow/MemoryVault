@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+// Types for database records
+interface SharedRecord {
+  mintAddress: string;
+  ownerWallet: string;
+  createdAt: Date;
+}
+
 // Types for Helius API response
 interface HeliusNft {
   id: string;
@@ -73,12 +80,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Batch fetch NFT data using Helius bulk API
-    const mintAddresses = sharedRecords.map((r) => r.mintAddress);
+    const mintAddresses = sharedRecords.map((r: SharedRecord) => r.mintAddress);
     
     if (!process.env.HELIUS_API_KEY) {
       console.warn("HELIUS_API_KEY not configured, falling back to limited data");
       // Return basic data without Helius metadata
-      const sharedNfts = sharedRecords.map((record) => ({
+      const sharedNfts = sharedRecords.map((record: SharedRecord) => ({
         mintAddress: record.mintAddress,
         name: `NFT ${record.mintAddress.slice(0, 8)}...`,
         image: null,
