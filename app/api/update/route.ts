@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         } else {
           console.log("Database record already exists, skipping creation");
         }
-      } catch (dbError: any) {
+      } catch (dbError: unknown) {
         console.error("Database error:", dbError);
         // Continue with the response even if DB operation fails
         // The NFT update is more important than the DB record
@@ -67,13 +67,14 @@ export async function POST(request: NextRequest) {
       metadataCid
     }, { status: 200 });
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("API Error:", e);
+    const error = e as Error;
     return NextResponse.json(
       { 
         error: "Internal Server Error",
-        details: e.message,
-        stack: process.env.NODE_ENV === "development" ? e.stack : undefined
+        details: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined
       },
       { status: 500 }
     );

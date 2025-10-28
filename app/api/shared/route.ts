@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-// const prisma = new PrismaClient();
+// Types for Helius API response
+interface HeliusNft {
+  id: string;
+  content?: {
+    json_uri?: string;
+  };
+}
+
+interface HeliusResponse {
+  result?: HeliusNft[];
+}
 
 // Helper: Convert ipfs:// links to HTTP URLs
 function ipfsToHttp(uri: string) {
@@ -63,12 +73,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Batch fetch NFT data using Helius bulk API
-    const mintAddresses = sharedRecords.map(r => r.mintAddress);
+    const mintAddresses = sharedRecords.map((r) => r.mintAddress);
     
     if (!process.env.HELIUS_API_KEY) {
       console.warn("HELIUS_API_KEY not configured, falling back to limited data");
       // Return basic data without Helius metadata
-      const sharedNfts = sharedRecords.map(record => ({
+      const sharedNfts = sharedRecords.map((record) => ({
         mintAddress: record.mintAddress,
         name: `NFT ${record.mintAddress.slice(0, 8)}...`,
         image: null,
@@ -95,13 +105,13 @@ export async function POST(req: NextRequest) {
       throw new Error(`Helius API failed: ${heliusRes.status}`);
     }
 
-    const heliusData = await heliusRes.json();
-    const nfts = heliusData.result || [];
+    const heliusData: HeliusResponse = await heliusRes.json();
+    const nfts: HeliusNft[] = heliusData.result || [];
 
     // Step 3: Parallel fetch of metadata
-    const metadataPromises = nfts.map(async (nft: any, index: number) => {
+    const metadataPromises = nfts.map(async (nft: HeliusNft, index: number) => {
       try {
-        const record = sharedRecords.find(r => r.mintAddress === nft.id);
+        const record = sharedRecords.find((r) => r.mintAddress === nft.id);
         if (!record) return null;
 
         const metadataUri = nft?.content?.json_uri;

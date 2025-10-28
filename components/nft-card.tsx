@@ -6,10 +6,23 @@ import { Eye, Share2, Users, Calendar, HardDrive, ImageIcon, Loader2 } from "luc
 import { BlurhashImage } from "./blurhash-image";
 import { validateBlurHash, ipfsToHttp } from "@/lib/utils";
 
+interface NftMetadata {
+  name?: string;
+  image?: string;
+  properties?: {
+    upload_date?: string;
+    original_size?: number;
+    blur_hash?: string;
+    blur_width?: number;
+    blur_height?: number;
+    allowed_viewers?: Record<string, any>;
+  };
+}
+
 interface NFTCardProps {
   nft: {
-    nft: any;
-    metadata: any;
+    nft: Record<string, unknown>;
+    metadata?: NftMetadata;
     mintAddress: string;
   };
   type: "owned" | "shared";
@@ -60,7 +73,7 @@ export function NFTCard({ nft, type, className }: NFTCardProps) {
             blurHash={validateBlurHash(nft.metadata?.properties?.blur_hash)}
             width={nft.metadata?.properties?.blur_width}
             height={nft.metadata?.properties?.blur_height}
-            src={ipfsToHttp(nft.metadata?.image)}
+            src={ipfsToHttp(nft.metadata?.image || "") || ""}
             alt={nft.metadata?.name || "NFT Photo"}
             containerClassName="aspect-square"
             className="rounded-lg"
@@ -92,7 +105,7 @@ export function NFTCard({ nft, type, className }: NFTCardProps) {
           <div>
             <div>
               <Calendar />
-              {formatDate(nft.metadata?.properties?.upload_date)}
+              {formatDate(nft.metadata?.properties?.upload_date || "")}
             </div>
             
             {nft.metadata?.properties?.original_size && (

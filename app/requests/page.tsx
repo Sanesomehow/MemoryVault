@@ -236,7 +236,13 @@ export default function RequestsPage() {
       const newKey = encryptAESKey(originalKey, viewerBytes);
 
       // Create new metadata with access controls
-      const viewerAccess: any = {
+      const viewerAccess: {
+        encrypted_key: string;
+        nonce: string;
+        expires_at?: string;
+        view_limit?: number;
+        views_remaining?: number;
+      } = {
         encrypted_key: newKey.encrypted,
         nonce: newKey.nonce,
       };

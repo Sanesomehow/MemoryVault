@@ -18,9 +18,27 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { validateBlurHash, ipfsToHttp } from "@/lib/utils";
 
+interface NftMetadata {
+  name?: string;
+  image?: string;
+  properties?: {
+    upload_date?: string;
+    original_size?: number;
+    blur_hash?: string;
+    blur_width?: number;
+    blur_height?: number;
+    allowed_viewers?: Record<string, any>;
+  };
+}
+
+interface NftData {
+  mintAddress: string;
+  metadata?: NftMetadata;
+}
+
 interface GallaryProps {
   publicKey: PublicKey;
-  sharedNfts?: any[];
+  sharedNfts?: NftData[];
   refresh?: number;
 }
 
@@ -28,7 +46,7 @@ type SortOption = "date-newest" | "date-oldest" | "name-asc" | "name-desc" | "si
 type TabType = "owned" | "shared";
 
 export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
-  const [ownedNfts, setOwnedNfts] = useState<any[]>([]);
+  const [ownedNfts, setOwnedNfts] = useState<NftData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("owned");
   const [searchQuery, setSearchQuery] = useState("");
@@ -326,7 +344,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredAndSortedNfts.map((nft, i) => {
             // Log NFT metadata for debugging
-            const imageUrl = ipfsToHttp(nft.metadata?.image);
+            const imageUrl = ipfsToHttp(nft.metadata?.image || "");
             const validBlurHash = validateBlurHash(nft.metadata?.properties?.blur_hash);
             
             console.log(`NFT ${i} metadata:`, {
@@ -339,7 +357,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
               blurWidth: nft.metadata?.properties?.blur_width,
               blurHeight: nft.metadata?.properties?.blur_height,
               // Check if there's any undefined value being passed as src
-              srcWillBe: ipfsToHttp(nft.metadata?.image),
+              srcWillBe: ipfsToHttp(nft.metadata?.image || ""),
               fullMetadata: nft.metadata
             });
 
@@ -353,7 +371,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
                         blurHash={validateBlurHash(nft.metadata?.properties?.blur_hash)}
                         width={nft.metadata?.properties?.blur_width}
                         height={nft.metadata?.properties?.blur_height}
-                        src={ipfsToHttp(nft.metadata?.image)}
+                        src={ipfsToHttp(nft.metadata?.image || "") || ""}
                         alt={nft.metadata?.name || "NFT Photo"}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
@@ -391,7 +409,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
                           </Button>
                           <p className="text-white/80 text-sm">
                             <Calendar className="h-3 w-3 inline mr-1" />
-                            {formatDate(nft.metadata?.properties?.upload_date)}
+                            {formatDate(nft.metadata?.properties?.upload_date || "")}
                           </p>
                         </div>
                       </div>
@@ -403,7 +421,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
                         {nft.metadata?.name || "Untitled Photo"}
                       </h3>
                       <p className="text-gray-500 text-sm">
-                        {formatDate(nft.metadata?.properties?.upload_date)}
+                        {formatDate(nft.metadata?.properties?.upload_date || "")}
                       </p>
                     </div>
                   </Link>

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     });
 
     // For each request, try to get NFT metadata if available
-    const requestsWithMetadata = requests.map((request: any) => ({
+    const requestsWithMetadata = requests.map((request) => ({
       ...request,
       nftName: `Photo ${request.mintAddress.slice(0, 8)}...`, // Placeholder for now
       createdAt: request.createdAt.toISOString(),

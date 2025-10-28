@@ -172,7 +172,7 @@ export default function Home() {
     }
 
     // Use toast.promise to handle the entire upload process
-    const uploadPromise = new Promise(async (resolve, reject) => {
+    const uploadPromise = new Promise<{ signature: string; mintAddress: string }>(async (resolve, reject) => {
       try {
         setLoadingState("encrypting");
         const mimeType: string = file.type;
@@ -288,10 +288,10 @@ export default function Home() {
     // Use toast.promise for the entire upload process
     toast.promise(uploadPromise, {
       loading: 'Encrypting and uploading photo...',
-      success: (result: any) => {
+      success: (result: { signature: string; mintAddress: string }) => {
         return `Photo minted successfully! Transaction: ${result.signature.slice(0, 8)}...`;
       },
-      error: (error: any) => {
+      error: (error: Error) => {
         const errorMessage = (error as Error).message;
         
         if (errorMessage.includes("Upload failed")) {

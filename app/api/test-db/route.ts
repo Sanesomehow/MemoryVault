@@ -12,13 +12,14 @@ export async function GET(request: NextRequest) {
       sharedAccessCount: count
     }, { status: 200 });
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Database test error:", e);
+    const error = e as Error;
     return NextResponse.json(
       { 
         error: "Database connection failed",
-        details: e.message,
-        stack: process.env.NODE_ENV === "development" ? e.stack : undefined
+        details: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined
       },
       { status: 500 }
     );

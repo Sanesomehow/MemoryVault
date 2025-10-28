@@ -3,6 +3,27 @@ import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { PublicKey } from "@solana/web3.js";
 import { umi } from "../umi";
 
+interface NftMetadata {
+  symbol?: string;
+  name?: string;
+  image?: string;
+  properties?: {
+    app?: string;
+    blur_hash?: string;
+    blur_width?: number;
+    blur_height?: number;
+    upload_date?: string;
+    original_size?: number;
+    allowed_viewers?: Record<string, any>;
+  };
+}
+
+interface ProcessedNft {
+  nft: Record<string, unknown>;
+  metadata: NftMetadata;
+  mintAddress: string;
+}
+
 // Multiple IPFS gateways for fallback (ordered by reliability)
 // Avoiding gateways that cause CORS preflight issues
 const IPFS_GATEWAYS = [
@@ -63,7 +84,7 @@ async function fetchWithOriginalGateway(uri: string): Promise<Response> {
     }
 }
 
-export async function fetchAllNft(publicKey: PublicKey) {
+export async function fetchAllNft(publicKey: PublicKey): Promise<ProcessedNft[]> {
     if(!publicKey) {
         throw new Error("Wallet not connected");
     }
@@ -77,7 +98,7 @@ export async function fetchAllNft(publicKey: PublicKey) {
     
     // Process NFTs in batches for better performance
     const batchSize = 10; // Process 10 at a time to avoid overwhelming IPFS gateways
-    const relatedNfts: any[] = [];
+    const relatedNfts: (ProcessedNft | null)[] = [];
     
     for (let i = 0; i < allNfts.length; i += batchSize) {
         const batch = allNfts.slice(i, i + batchSize);

@@ -54,15 +54,25 @@ enum UserRole {
   none = "none",
 }
 
+interface NftData {
+  nft?: any;
+  metadata?: {
+    name?: string;
+    image?: string;
+    properties?: Record<string, any>;
+  };
+  mintAddress?: string;
+}
+
 // Component for access denied screen
 function AccessDeniedScreen({ 
   nftData, 
   mintAddress, 
   publicKey 
 }: { 
-  nftData: any; 
+  nftData: NftData; 
   mintAddress: string; 
-  publicKey: any; 
+  publicKey: PublicKey | null; 
 }) {
   const [requestStatus, setRequestStatus] = useState<"none" | "pending" | "approved" | "denied">("none");
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
@@ -394,7 +404,13 @@ function generateBlink() {
       console.log("new key: ", newKey);
 
       // Create new metadata with access controls
-      const viewerAccess: any = {
+      const viewerAccess: {
+        encrypted_key: string;
+        nonce: string;
+        expires_at?: string;
+        view_limit?: number;
+        views_remaining?: number;
+      } = {
         encrypted_key: newKey.encrypted,
         nonce: newKey.nonce,
       };
