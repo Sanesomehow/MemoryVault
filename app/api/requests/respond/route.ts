@@ -22,6 +22,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the request details first
+    const existingRequest = await prisma.accessRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!existingRequest) {
+      return NextResponse.json(
+        { error: "Request not found" },
+        { status: 404 }
+      );
+    }
+
     // Update the request status
     const updatedRequest = await prisma.accessRequest.update({
       where: { id: requestId },

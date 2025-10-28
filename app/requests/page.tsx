@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Clock, User, MessageSquare, Check, X, CheckCircle, Users, Upload, Eye } from "lucide-react";
+import { Clock, User, MessageSquare, Check, X, CheckCircle, Users, Upload, Eye, Key, Share2 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import ShareAccessDialog from "@/components/share-access-dialog";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -25,11 +27,13 @@ interface AccessRequest {
 }
 
 export default function RequestsPage() {
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingRequests, setProcessingRequests] = useState<Set<string>>(new Set());
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const [grantingAccess, setGrantingAccess] = useState<boolean>(false);
+  const [nftDataCache, setNftDataCache] = useState<Record<string, any>>({});
 
   // Fetch access requests
   const fetchRequests = async () => {
@@ -62,13 +66,61 @@ export default function RequestsPage() {
   }, [publicKey]);
 
   const handleRequestResponse = async (requestId: string, action: "approve" | "deny") => {
+    if (action === "deny") {
+      // Simple deny - just update status
+      setProcessingRequests(prev => new Set(prev).add(requestId));
+      
+      try {
+        const response = await fetch(`/api/requests/respond`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId, action })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        // Update local state
+        setRequests(prev => 
+          prev.map(req => 
+            req.id === requestId 
+              ? { ...req, status: "denied" }
+              : req
+          )
+        );
+
+        toast.success("Request denied", {
+          description: "The request has been declined"
+        });
+      } catch (err) {
+        console.error(`Error denying request:`, err);
+        toast.error(`Failed to deny request`, {
+          description: err instanceof Error ? err.message : "Please try again"
+        });
+      } finally {
+        setProcessingRequests(prev => {
+          const next = new Set(prev);
+          next.delete(requestId);
+          return next;
+        });
+      }
+    } else {
+      // Approve AND grant access in one step
+      await handleApproveAndGrantAccess(requestId);
+    }
+  };
+
+  const handleApproveAndGrantAccess = async (requestId: string) => {
     setProcessingRequests(prev => new Set(prev).add(requestId));
     
     try {
+      // First approve the request
       const response = await fetch(`/api/requests/respond`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, action })
+        body: JSON.stringify({ requestId, action: "approve" })
       });
 
       if (!response.ok) {
@@ -76,26 +128,27 @@ export default function RequestsPage() {
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      // Update local state
+      const result = await response.json();
+      const request = result.request;
+
+      // Now grant access by updating NFT metadata
+      await handleGrantAccess(request.requesterWallet, request.mintAddress);
+
+      // Update local state to remove from pending
       setRequests(prev => 
         prev.map(req => 
           req.id === requestId 
-            ? { ...req, status: action === "approve" ? "approved" : "denied" }
+            ? { ...req, status: "approved" }
             : req
         )
       );
 
-      toast.success(
-        action === "approve" ? "Access granted!" : "Request denied",
-        {
-          description: action === "approve" 
-            ? "The user can now view your photo" 
-            : "The request has been declined"
-        }
-      );
+      toast.success("Access granted successfully!", {
+        description: "The user can now view and decrypt your photo"
+      });
     } catch (err) {
-      console.error(`Error ${action}ing request:`, err);
-      toast.error(`Failed to ${action} request`, {
+      console.error(`Error approving and granting access:`, err);
+      toast.error(`Failed to grant access`, {
         description: err instanceof Error ? err.message : "Please try again"
       });
     } finally {
@@ -123,6 +176,200 @@ export default function RequestsPage() {
 
     for (const request of pendingRequests) {
       await handleRequestResponse(request.id, action);
+    }
+  };
+
+  // Load NFT data for sharing access
+  const loadNftData = async (mintAddress: string) => {
+    if (nftDataCache[mintAddress]) return nftDataCache[mintAddress];
+    
+    try {
+      const { fetchSingleNft } = await import("@/lib/nft/nftFetch");
+      const { PublicKey } = await import("@solana/web3.js");
+      
+      if (!publicKey) throw new Error("Wallet not connected");
+      
+      const nftData = await fetchSingleNft(publicKey, mintAddress);
+      setNftDataCache(prev => ({ ...prev, [mintAddress]: nftData }));
+      return nftData;
+    } catch (error) {
+      console.error("Failed to load NFT data:", error);
+      throw error;
+    }
+  };
+
+  // Handle granting access (updating NFT metadata with encryption key)
+  const handleGrantAccess = async (
+    walletAddress: string, 
+    mintAddress: string,
+    options?: { timeLimit?: string; viewLimit?: number }
+  ) => {
+    console.log("🚀 Starting handleGrantAccess:", { walletAddress, mintAddress, options });
+    setGrantingAccess(true);
+    try {
+      if (!publicKey) {
+        throw new Error("Wallet not connected");
+      }
+
+      console.log("📱 Owner wallet:", publicKey.toBase58());
+
+      // Load NFT data
+      console.log("📦 Loading NFT data for:", mintAddress);
+      const nftData = await loadNftData(mintAddress);
+      console.log("📦 NFT data loaded:", nftData);
+      
+      const encryptedKey = nftData.metadata.properties.owner_encrypted_key;
+      const nonce = nftData.metadata.properties.encryption_params.nonce;
+      
+      // Import crypto functions dynamically
+      const { decryptAESKey, encryptAESKey } = await import("@/lib/crypto/keyEncryption");
+      const bs58 = await import("bs58");
+      
+      const viewerBytes = bs58.default.decode(walletAddress);
+      const ownerBytes = publicKey.toBytes();
+
+      const originalKey = decryptAESKey(encryptedKey, nonce, ownerBytes);
+      if (!originalKey) {
+        throw new Error("Decryption failed");
+      }
+
+      const newKey = encryptAESKey(originalKey, viewerBytes);
+
+      // Create new metadata with access controls
+      const viewerAccess: any = {
+        encrypted_key: newKey.encrypted,
+        nonce: newKey.nonce,
+      };
+
+      // Add optional time and view limits
+      if (options?.timeLimit && options.timeLimit !== "never") {
+        const expirationDate = new Date();
+        switch (options.timeLimit) {
+          case "1h": expirationDate.setHours(expirationDate.getHours() + 1); break;
+          case "1d": expirationDate.setDate(expirationDate.getDate() + 1); break;
+          case "1w": expirationDate.setDate(expirationDate.getDate() + 7); break;
+          case "1m": expirationDate.setMonth(expirationDate.getMonth() + 1); break;
+        }
+        viewerAccess.expires_at = expirationDate.toISOString();
+      }
+
+      if (options?.viewLimit && options.viewLimit > 0) {
+        viewerAccess.view_limit = options.viewLimit;
+        viewerAccess.views_remaining = options.viewLimit;
+      }
+
+      const newMetadata = {
+        ...nftData.metadata,
+        properties: {
+          ...nftData.metadata.properties,
+          allowed_viewers: {
+            ...nftData.metadata.properties.allowed_viewers,
+            [walletAddress]: viewerAccess,
+          },
+        },
+      };
+      
+      console.log("🔄 Sending update request to /api/update with:", {
+        viewerWallet: walletAddress,
+        mintAddress: mintAddress,
+        owner: publicKey.toBase58(),
+        metadataPreview: {
+          name: newMetadata.name,
+          allowedViewersCount: Object.keys(newMetadata.properties.allowed_viewers).length
+        }
+      });
+
+      const updateRequest = await fetch("/api/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metadata: newMetadata,
+          viewerWallet: walletAddress,
+          mintAddress: mintAddress,
+          owner: publicKey.toBase58(),
+        }),
+      });
+
+      console.log("📤 Update request response status:", updateRequest.status);
+
+      if (!updateRequest.ok) {
+        const errorData = await updateRequest.json().catch(() => ({}));
+        console.error("❌ Update request failed:", errorData);
+        throw new Error(`Update failed: ${errorData.details || updateRequest.statusText}`);
+      }
+
+      const result = await updateRequest.json();
+      console.log("✅ Metadata uploaded to IPFS:", result);
+
+      // Now update the NFT metadata URI on-chain
+      console.log("🔗 Updating NFT metadata URI on-chain...");
+      const { umi } = await import("@/lib/umi");
+      const { updateV1 } = await import("@metaplex-foundation/mpl-token-metadata");
+      const { publicKey: umiPublicKey } = await import("@metaplex-foundation/umi");
+      const { walletAdapterIdentity } = await import("@metaplex-foundation/umi-signer-wallet-adapters");
+
+      // Configure UMI with wallet (same setup as photo detail page)
+      umi.use(walletAdapterIdentity({
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      }));
+
+      const newMetadataUri = `ipfs://${result.metadataCid}`;
+      console.log("📍 New metadata URI:", newMetadataUri);
+
+      const creatorsArray = nftData.nft.metadata.creators ?? [
+        {
+          address: nftData.nft.metadata.updateAuthority,
+          verified: true,
+          share: 100,
+        },
+      ];
+
+      const updatedData = {
+        name: nftData.nft.name || "MemoryVault Photo",
+        symbol: "MVLT",
+        sellerFeeBasisPoints: nftData.nft.seller_fee_basis_points,
+        uri: newMetadataUri,
+        creators: creatorsArray,
+      };
+
+      console.log("🚀 Sending blockchain transaction...");
+      const changeUri = await updateV1(umi, {
+        mint: umiPublicKey(mintAddress),
+        authority: umi.identity,
+        data: updatedData,
+      }).sendAndConfirm(umi);
+
+      console.log("✅ NFT metadata updated on-chain:", changeUri);
+
+      toast.success("Access granted successfully!", {
+        description: "The user can now decrypt and view the photo."
+      });
+
+      // Clear cache to force reload
+      setNftDataCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[mintAddress];
+        return newCache;
+      });
+
+      // Refresh the requests list to reflect changes
+      await fetchRequests();
+
+      // Add a small delay to ensure blockchain propagation
+      setTimeout(() => {
+        console.log("✨ Access granted - blockchain update should be propagated now");
+      }, 3000);
+      
+    } catch (e) {
+      console.error("Error granting access:", e);
+      toast.error("Failed to grant access", {
+        description: (e as Error).message
+      });
+      throw e;
+    } finally {
+      setGrantingAccess(false);
     }
   };
 
@@ -202,7 +449,8 @@ export default function RequestsPage() {
   }
 
   const pendingRequests = requests.filter(req => req.status === "pending");
-  const processedRequests = requests.filter(req => req.status !== "pending");
+  const approvedRequests = requests.filter(req => req.status === "approved");
+  const deniedRequests = requests.filter(req => req.status === "denied");
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500">
@@ -268,20 +516,46 @@ export default function RequestsPage() {
           </div>
         )}
 
-        {/* Processed Requests */}
-        {processedRequests.length > 0 && (
+        {/* Approved Requests */}
+        {approvedRequests.length > 0 && (
           <div>
             <div className="flex items-center gap-3 mb-6">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <h2 className="text-xl font-semibold text-gray-900">
-                Recent Activity
+                Recently Approved
               </h2>
               <Badge variant="secondary" className="px-3 py-1">
-                {processedRequests.length}
+                {approvedRequests.length}
               </Badge>
             </div>
             <div className="space-y-4">
-              {processedRequests.slice(0, 10).map((request) => (
+              {approvedRequests.slice(0, 10).map((request) => (
+                <RequestCard
+                  key={request.id}
+                  request={request}
+                  shortenAddress={shortenAddress}
+                  timeAgo={timeAgo}
+                  readonly
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Denied Requests */}
+        {deniedRequests.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-6">
+              <X className="h-5 w-5 text-red-600" />
+              <h2 className="text-xl font-semibold text-gray-900">
+                Denied Requests
+              </h2>
+              <Badge variant="secondary" className="px-3 py-1">
+                {deniedRequests.length}
+              </Badge>
+            </div>
+            <div className="space-y-4">
+              {deniedRequests.slice(0, 10).map((request) => (
                 <RequestCard
                   key={request.id}
                   request={request}
@@ -413,7 +687,7 @@ function RequestCard({
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Approve
+                    Approve & Grant Access
                   </>
                 )}
               </Button>
@@ -434,6 +708,8 @@ function RequestCard({
               </Button>
             </div>
           )}
+
+
         </div>
       </CardContent>
     </Card>

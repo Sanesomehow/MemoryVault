@@ -50,7 +50,8 @@ export async function GET(
       if (metadata?.image) {
         if (metadata.image.startsWith('ipfs://')) {
           const cid = metadata.image.replace('ipfs://', '');
-          imageUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+          const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL || 'gateway.pinata.cloud';
+          imageUrl = `https://${gateway}/ipfs/${cid}`;
         } else {
           imageUrl = metadata.image;
         }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Eye, Share2, Users, Calendar, HardDrive, ImageIcon, Loader2 } from "lucide-react";
 import { BlurhashImage } from "./blurhash-image";
+import { validateBlurHash, ipfsToHttp } from "@/lib/utils";
 
 interface NFTCardProps {
   nft: {
@@ -56,9 +57,10 @@ export function NFTCard({ nft, type, className }: NFTCardProps) {
       <Link href={`/gallery/${nft.mintAddress}`}>
         <div>
           <BlurhashImage
-            blurHash={nft.metadata?.properties?.blur_hash}
+            blurHash={validateBlurHash(nft.metadata?.properties?.blur_hash)}
             width={nft.metadata?.properties?.blur_width}
             height={nft.metadata?.properties?.blur_height}
+            src={ipfsToHttp(nft.metadata?.image)}
             alt={nft.metadata?.name || "NFT Photo"}
             containerClassName="aspect-square"
             className="rounded-lg"

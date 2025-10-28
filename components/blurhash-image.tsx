@@ -47,7 +47,9 @@ export function BlurhashImage({
       src,
       alt,
       hasBlurHash: !!blurHash,
-      hasSrc: !!src
+      hasSrc: !!src,
+      srcType: typeof src,
+      srcValue: src?.substring(0, 50) + (src && src.length > 50 ? '...' : '')
     });
   }, [blurHash, width, height, src, alt]);
 
@@ -61,7 +63,7 @@ export function BlurhashImage({
       isValidBlurHash: blurHash && blurHash.length > 0
     });
 
-    if (!blurHash || blurHash.trim() === '') {
+    if (!blurHash || blurHash.trim() === '' || blurHash === 'undefined' || blurHash.startsWith('undefined')) {
       console.log('Skipping blurhash rendering - no valid blurhash');
       setCanvasReady(true);
       return;
@@ -127,14 +129,23 @@ export function BlurhashImage({
     return () => clearTimeout(timeout);
   }, [blurHash, canvasElement]);
 
-  const shouldShowCanvas = blurHash && canvasReady && (!src || (!imageLoaded && !imageError));
-  const shouldShowFallback = !blurHash && !src;
+  const isValidBlurHash = blurHash && blurHash.trim() !== '' && blurHash !== 'undefined' && !blurHash.startsWith('undefined');
+  
+  // Show canvas if: valid blurhash AND (no src OR image not loaded yet OR image failed to load)
+  const shouldShowCanvas = isValidBlurHash && canvasReady && (!src || !imageLoaded || imageError);
+  
+  // Show fallback only if: no valid blurhash AND no src
+  const shouldShowFallback = !isValidBlurHash && !src;
+  
+  // Show image error fallback only if: has src AND error loading AND no valid blurhash to fallback to
+  const shouldShowImageErrorFallback = src && imageError && !isValidBlurHash;
   
   console.log('BlurhashImage render state:', { 
-    hasBlurHash: !!blurHash, 
+    hasBlurHash: isValidBlurHash, 
     canvasReady, 
     shouldShowCanvas,
     shouldShowFallback,
+    shouldShowImageErrorFallback,
     hasSrc: !!src,
     imageLoaded,
     imageError,
@@ -185,7 +196,7 @@ export function BlurhashImage({
       )}
 
       {/* Fallback for no blurhash and no src */}
-      {!blurHash && !src && (
+      {shouldShowFallback && (
         <div className={cn(
           "w-full h-full bg-gray-200 flex items-center justify-center",
           className
@@ -197,8 +208,8 @@ export function BlurhashImage({
         </div>
       )}
 
-      {/* Fallback for image error */}
-      {src && imageError && (
+      {/* Fallback for image error (only when no blurhash available) */}
+      {shouldShowImageErrorFallback && (
         <div className={cn(
           "w-full h-full bg-gray-200 flex items-center justify-center",
           className

@@ -79,8 +79,11 @@ export function RequestAccessModal({
         description: "The owner will be notified of your request."
       });
 
+      // Reset form state
       setOpen(false);
       setMessage("");
+      
+      // Call callback if provided
       onRequestSent?.();
       
     } catch (error) {
@@ -89,7 +92,10 @@ export function RequestAccessModal({
         description: error instanceof Error ? error.message : "Please try again later"
       });
     } finally {
-      setIsSubmitting(false);
+      // Small delay to ensure UI updates properly
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, 100);
     }
   };
 
@@ -173,7 +179,7 @@ export function RequestAccessModal({
 
           {/* Info Section */}
           <Card className="border-2 border-blue-100 bg-blue-50/50">
-            <CardContent className="pt-6">
+            <CardContent className="">
               <div className="flex items-start gap-3">
                 <Info className="h-5 w-5 text-blue-600 mt-0.5" />
                 <div>
@@ -202,7 +208,7 @@ export function RequestAccessModal({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !requesterAddress}
-            className="gap-2 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
+            className="gap-2 border border-black-300 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">

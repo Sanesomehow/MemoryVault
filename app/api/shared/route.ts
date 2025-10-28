@@ -8,7 +8,8 @@ function ipfsToHttp(uri: string) {
   if (!uri) return "";
   if (uri.startsWith("ipfs://")) {
     const cid = uri.replace("ipfs://", "").split("/")[0];
-    return `https://gateway.pinata.cloud/ipfs/${cid}`;
+    const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL || 'gateway.pinata.cloud';
+    return `https://${gateway}/ipfs/${cid}`;
   }
   return uri;
 }
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
           return {
             mintAddress: record.mintAddress,
             name: metadata.name,
-            image: metadata.image,
+            image: ipfsToHttp(metadata.image), // Convert IPFS URLs to HTTP
             description: metadata.description || "",
             ownerWallet: record.ownerWallet,
             metadataCid: metadataUri,

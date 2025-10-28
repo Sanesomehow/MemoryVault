@@ -242,25 +242,35 @@ export default function SharedPhotos() {
             <Card className="overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <CardContent className="p-0">
                 <div className="relative overflow-hidden aspect-square">
-                  {nft.metadata?.properties?.blur_hash ? (
-                    <BlurhashImage
-                      blurHash={nft.metadata.properties.blur_hash}
-                      width={nft.metadata.properties.blur_width}
-                      height={nft.metadata.properties.blur_height}
-                      src={nft.image}
-                      alt={nft.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                  ) : (
-                    <img
-                      src={nft.image}
-                      alt={nft.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/assets/placeholder-image.svg';
-                      }}
-                    />
-                  )}
+                  {(() => {
+                    const blurHash = nft.metadata?.properties?.blur_hash;
+                    const isValidBlurHash = blurHash && 
+                      typeof blurHash === 'string' && 
+                      blurHash !== 'undefined' && 
+                      !blurHash.startsWith('undefined') &&
+                      blurHash.trim() !== '';
+                    
+                    // Debug logging
+                    console.log('Shared NFT debug:', {
+                      nftName: nft.name,
+                      nftImage: nft.image,
+                      blurHash: blurHash,
+                      isValidBlurHash: isValidBlurHash,
+                      imageExists: !!nft.image
+                    });
+                    
+                    // Always use BlurhashImage component for consistency
+                    return (
+                      <BlurhashImage
+                        blurHash={isValidBlurHash ? blurHash : undefined}
+                        width={nft.metadata?.properties?.blur_width}
+                        height={nft.metadata?.properties?.blur_height}
+                        src={nft.image}
+                        alt={nft.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    );
+                  })()}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
                 </div>
                 <div className="p-4 space-y-3">

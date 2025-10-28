@@ -39,6 +39,7 @@ import {
   Share2, 
   ShieldX, 
   Check, 
+  CheckCircle,
   Loader2, 
   Eye, 
   Lock, 
@@ -66,11 +67,12 @@ function AccessDeniedScreen({
   const [requestStatus, setRequestStatus] = useState<"none" | "pending" | "approved" | "denied">("none");
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
-  // Check request status from API
-  const checkRequestStatus = async () => {
+  // Check request status and actual access
+  const checkRequestStatusAndAccess = async () => {
     if (!publicKey) return;
     
     try {
+      // First check request status
       const response = await fetch(
         `/api/requests/create?requester=${publicKey.toBase58()}&mint=${mintAddress}`
       );
@@ -78,7 +80,76 @@ function AccessDeniedScreen({
       if (response.ok) {
         const data = await response.json();
         const status = data.status || "none";
-        setRequestStatus(status);
+        
+        // If approved, check if we have actual decryption access
+        if (status === "approved") {
+          // Try to reload NFT data to check for access in metadata
+          try {
+            const { fetchSingleNft } = await import("@/lib/nft/nftFetch");
+            const { PublicKey } = await import("@solana/web3.js");
+            
+            const nftData = await fetchSingleNft(publicKey, mintAddress);
+            const walletAddress = publicKey.toBase58();
+            
+            // Check if we now have access in the NFT metadata
+            const allowedViewers = nftData.metadata.properties.allowed_viewers || {};
+            const hasDecryptionKey = Object.keys(allowedViewers).some(
+              k => k.trim() === walletAddress.trim()
+            );
+            
+            console.log("🔄 Checking access after approval:");
+            console.log("📋 Metadata URI:", nftData.nft.metadata.uri);
+            console.log("👥 Allowed viewers:", Object.keys(allowedViewers));
+            console.log("🔑 Has decryption key:", hasDecryptionKey);
+            
+            if (hasDecryptionKey) {
+              console.log("✅ Access confirmed! Reloading page...");
+              toast.success("Access granted! Loading photo...");
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+              return;
+            } else {
+              // Still approved but no decryption key yet
+              setRequestStatus("approved");
+              console.log("⏳ Still waiting for access grant...");
+              
+              // Show different message based on time elapsed
+              const now = Date.now();
+              const stored = localStorage.getItem(`access_request_${mintAddress}`);
+              let approvalTime = now;
+              
+              if (stored) {
+                try {
+                  const data = JSON.parse(stored);
+                  approvalTime = data.timestamp || now;
+                } catch (e) {
+                  // Ignore parsing errors
+                }
+              }
+              
+              const elapsed = now - approvalTime;
+              const minutes = Math.floor(elapsed / 60000);
+              
+              if (minutes < 2) {
+                toast.info("Request approved! Waiting for access grant...", {
+                  description: "The owner is now updating the photo access permissions.",
+                  duration: 5000
+                });
+              } else {
+                toast.warning("Still waiting for access...", {
+                  description: "This is taking longer than expected. The owner may need to complete the process.",
+                  duration: 7000
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Failed to check NFT access:", error);
+            setRequestStatus(status);
+          }
+        } else {
+          setRequestStatus(status);
+        }
         
         // Update localStorage
         if (status !== "none") {
@@ -87,14 +158,6 @@ function AccessDeniedScreen({
             timestamp: Date.now(),
             requestId: data.requestId
           }));
-        }
-        
-        // If approved, reload the page to show photo
-        if (status === "approved") {
-          toast.success("Access granted! Loading photo...");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
         }
       }
     } catch (error) {
@@ -115,13 +178,15 @@ function AccessDeniedScreen({
     }
     
     // Also check API for latest status
-    checkRequestStatus();
+    checkRequestStatusAndAccess();
   }, [mintAddress, publicKey]);
 
-  // Set up polling for pending requests
+      // Set up polling for pending and approved requests
   useEffect(() => {
-    if (requestStatus === "pending" && publicKey) {
-      const interval = setInterval(checkRequestStatus, 30000); // Poll every 30 seconds
+    if ((requestStatus === "pending" || requestStatus === "approved") && publicKey) {
+      // More frequent polling for approved requests since access should be granted quickly
+      const pollInterval = requestStatus === "approved" ? 5000 : 10000;
+      const interval = setInterval(checkRequestStatusAndAccess, pollInterval);
       setPollingInterval(interval);
       
       return () => {
@@ -189,6 +254,21 @@ function AccessDeniedScreen({
               </div>
               <Button disabled className="w-full">
                 Request Sent - Awaiting Response
+              </Button>
+            </div>
+          ) : requestStatus === "approved" ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-800">Request Approved</span>
+                </div>
+                <p className="text-sm text-green-700">
+                  Your request has been approved! The owner is now granting you access to decrypt the photo.
+                </p>
+              </div>
+              <Button disabled className="w-full">
+                Waiting for Decryption Key...
               </Button>
             </div>
           ) : requestStatus === "denied" ? (
@@ -426,6 +506,10 @@ function generateBlink() {
 
       try {
         setLoading(true);
+        setError(null); // Clear any previous errors
+        
+        console.log(`Loading NFT: ${mintAddress} for wallet: ${publicKey.toBase58()}`);
+        
         const { nft, metadata, metadataCid, isOwner } = await fetchSingleNft(
           publicKey,
           mintAddress
@@ -437,11 +521,30 @@ function generateBlink() {
       } catch (e) {
         console.error("Error loading NFT:", e);
         const errorMessage = (e as Error).message;
+        
         if (errorMessage.includes("not found") || errorMessage.includes("404")) {
           setError({
             title: "Photo Not Found",
             message: "This photo doesn't exist or may have been deleted.",
             type: "nft_not_found"
+          });
+        } else if (errorMessage.includes("CORS") || errorMessage.includes("blocked")) {
+          setError({
+            title: "Network Access Issue",
+            message: "Unable to access photo metadata due to network restrictions. Please try again later.",
+            type: "load_failed"
+          });
+        } else if (errorMessage.includes("429") || errorMessage.includes("Too Many Requests")) {
+          setError({
+            title: "Rate Limit Exceeded",
+            message: "Too many requests to the metadata server. Please wait a moment and try again.",
+            type: "load_failed"
+          });
+        } else if (errorMessage.includes("All gateways failed")) {
+          setError({
+            title: "Metadata Server Unavailable",
+            message: "All metadata servers are currently unavailable. Please try again later.",
+            type: "load_failed"
           });
         } else {
           setError({
@@ -456,6 +559,34 @@ function generateBlink() {
 
     loadNFT();
   }, [publicKey, mintAddress]);
+
+  // Manual retry function
+  const retryLoadNFT = async () => {
+    if (!publicKey || !mintAddress) return;
+    
+    setError(null);
+    setLoading(true);
+    setNftData(null);
+    
+    try {
+      console.log(`Retrying NFT load: ${mintAddress}`);
+      const { nft, metadata, metadataCid, isOwner } = await fetchSingleNft(
+        publicKey,
+        mintAddress
+      );
+      setNftData({ nft, metadata, metadataCid, isOwner });
+    } catch (e) {
+      console.error("Retry failed:", e);
+      const errorMessage = (e as Error).message;
+      setError({
+        title: "Retry Failed",
+        message: `Still unable to load photo: ${errorMessage}`,
+        type: "load_failed"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!nftData || !publicKey) return;
@@ -479,7 +610,12 @@ function generateBlink() {
         // console.log("nft.token.owner: ", nft.token.owner);
         console.log("walletAddress: ", walletAddress);
 
-        const keys = Object.keys(allowed_viewers);
+        console.log("🔍 Checking access for wallet:", walletAddress);
+        console.log("🏠 NFT owner check - isOwner:", isOwner);
+        console.log("👥 Allowed viewers in metadata:", Object.keys(allowed_viewers || {}));
+        console.log("📋 Full metadata properties:", metadata.properties);
+
+        const keys = Object.keys(allowed_viewers || {});
         const viewerAccessKey = keys.find(
           (k) => k.trim() === walletAddress.trim()
         );
@@ -487,11 +623,18 @@ function generateBlink() {
           ? allowed_viewers[viewerAccessKey]
           : null;
 
-        // if (nft.token?.owner === walletAddress) {
+        console.log("🔑 Viewer access key found:", viewerAccessKey);
+        console.log("🔓 Viewer access object:", viewerAccessObj);
+
+        // Check if user is owner
         if (isOwner) {
+          console.log("✅ User is owner - granting owner access");
           role = UserRole.owner;
           encryptedKey = owner_encrypted_key;
-        } else if (viewerAccessObj) {
+        } 
+        // Check if user has access through metadata (manual sharing)
+        else if (viewerAccessObj) {
+          console.log("✅ User has viewer access - granting viewer access");
           role = UserRole.viewer;
           encryptedKey = viewerAccessObj.encrypted_key;
 
@@ -499,8 +642,10 @@ function generateBlink() {
             ...metadata.properties.encryption_params,
             nonce: viewerAccessObj.nonce,
           };
-          // metadata.properties.encryption_params.nonce = viewerAccessObj.nonce;
-        } else {
+        } 
+        // No access through metadata
+        else {
+          console.log("❌ No access found for user");
           role = UserRole.none;
         }
 
@@ -616,12 +761,6 @@ function generateBlink() {
   }
 
   if (error) {
-    const retryLoadNFT = async () => {
-      setError(null);
-      setLoading(true);
-      setNftData(null);
-    };
-
     return (
       <div className="max-w-6xl mx-auto px-6 py-8">
         <ErrorAlert
@@ -659,7 +798,17 @@ function generateBlink() {
             <div className="relative rounded-lg overflow-hidden aspect-square lg:aspect-auto">
               {decryptedUrl ? (
                 <BlurhashImage
-                  blurHash={nftData.metadata?.properties?.blur_hash}
+                  blurHash={(() => {
+                    const blurHash = nftData.metadata?.properties?.blur_hash;
+                    if (!blurHash || 
+                        typeof blurHash !== 'string' || 
+                        blurHash === 'undefined' || 
+                        blurHash.startsWith('undefined') ||
+                        blurHash.trim() === '') {
+                      return undefined;
+                    }
+                    return blurHash;
+                  })()}
                   width={nftData.metadata?.properties?.blur_width}
                   height={nftData.metadata?.properties?.blur_height}
                   src={decryptedUrl}

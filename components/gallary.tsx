@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { fetchAllNft } from "@/lib/nft/nftFetch";
 import { PublicKey } from "@solana/web3.js";
-import { Search, ImagePlus, Calendar, Eye, ChevronDown, SortAsc } from "lucide-react";
+import { Search, ImagePlus, Calendar, Eye, ChevronDown, SortAsc, PersonStandingIcon, RefreshCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BlurhashImage } from "./blurhash-image";
+import { toast } from "sonner";
 import Link from "next/link";
+import { validateBlurHash, ipfsToHttp } from "@/lib/utils";
 
 interface GallaryProps {
   publicKey: PublicKey;
@@ -49,6 +51,30 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
       loadNFTs();
     }
   }, [publicKey, refresh]);
+
+  // Auto-refresh when user returns to tab (handles blockchain propagation delays)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (!document.hidden && publicKey && ownedNfts.length > 0) {
+        // Wait a bit then check for new NFTs in case user just minted a photo
+        setTimeout(async () => {
+          try {
+            const newNfts = await fetchAllNft(publicKey);
+            if (newNfts.length > ownedNfts.length) {
+              const newCount = newNfts.length - ownedNfts.length;
+              setOwnedNfts(newNfts);
+              toast.success(`Gallery updated! Found ${newCount} new photo${newCount > 1 ? 's' : ''}`);
+            }
+          } catch (error) {
+            console.error("Auto-refresh failed:", error);
+          }
+        }, 3000); // Wait 3 seconds for blockchain propagation
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [publicKey, ownedNfts.length]);
 
   const currentNfts = activeTab === "owned" ? ownedNfts : sharedNfts;
 
@@ -236,18 +262,50 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
             />
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
+          <div className="flex gap-2">
+            {/* Refresh button for owned photos */}
+            {activeTab === "owned" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const newNfts = await fetchAllNft(publicKey!);
+                    if (newNfts.length > ownedNfts.length) {
+                      const newCount = newNfts.length - ownedNfts.length;
+                      toast.success(`Found ${newCount} new photo${newCount > 1 ? 's' : ''}!`);
+                    } else if (newNfts.length === ownedNfts.length) {
+                      toast.info("Gallery is up to date");
+                    }
+                    setOwnedNfts(newNfts);
+                  } catch (error) {
+                    toast.error("Failed to refresh gallery");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
                 className="gap-2 hover:scale-105 transition-all duration-200"
-                aria-label="Sort photos"
+                aria-label="Refresh gallery"
               >
-                <SortAsc className="h-4 w-4" />
-                {sortOptions.find(opt => opt.value === sortBy)?.label}
-                <ChevronDown className="h-4 w-4" />
+                <RefreshCcw className="h-4 w-4" />
+                Refresh
               </Button>
-            </DropdownMenuTrigger>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="gap-2 hover:scale-105 transition-all duration-200"
+                  aria-label="Sort photos"
+                >
+                  <SortAsc className="h-4 w-4" />
+                  {sortOptions.find(opt => opt.value === sortBy)?.label}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg">
               {sortOptions.map((option) => (
                 <DropdownMenuItem
@@ -259,6 +317,7 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       )}
 
@@ -267,13 +326,20 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredAndSortedNfts.map((nft, i) => {
             // Log NFT metadata for debugging
+            const imageUrl = ipfsToHttp(nft.metadata?.image);
+            const validBlurHash = validateBlurHash(nft.metadata?.properties?.blur_hash);
+            
             console.log(`NFT ${i} metadata:`, {
               mintAddress: nft.mintAddress,
               name: nft.metadata?.name,
-              properties: nft.metadata?.properties,
+              originalImage: nft.metadata?.image,
+              convertedImageUrl: imageUrl,
               blurHash: nft.metadata?.properties?.blur_hash,
+              validBlurHash: validBlurHash,
               blurWidth: nft.metadata?.properties?.blur_width,
               blurHeight: nft.metadata?.properties?.blur_height,
+              // Check if there's any undefined value being passed as src
+              srcWillBe: ipfsToHttp(nft.metadata?.image),
               fullMetadata: nft.metadata
             });
 
@@ -284,13 +350,34 @@ export function Gallary({ publicKey, sharedNfts = [], refresh }: GallaryProps) {
                     {/* Image Container */}
                     <div className="relative aspect-square overflow-hidden rounded-lg">
                       <BlurhashImage
-                        blurHash={nft.metadata?.properties?.blur_hash}
+                        blurHash={validateBlurHash(nft.metadata?.properties?.blur_hash)}
                         width={nft.metadata?.properties?.blur_width}
                         height={nft.metadata?.properties?.blur_height}
-                        // src={getImageUrl()}
+                        src={ipfsToHttp(nft.metadata?.image)}
                         alt={nft.metadata?.name || "NFT Photo"}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
+
+                      {/* Share Count Badge - Top Right */}
+                      {(() => {
+                        const allowedViewers = nft.metadata?.properties?.allowed_viewers || {};
+                        const shareCount = Object.keys(allowedViewers).length;
+                        
+                        if (shareCount > 0 && activeTab === "owned") {
+                          return (
+                            <div className="absolute top-2 right-2 z-10">
+                              <Badge 
+                                variant="secondary" 
+                                className="bg-blue-600 text-white border-0 text-xs px-2 py-1 backdrop-blur-sm"
+                              >
+                                <PersonStandingIcon className="h-3 w-3 mr-1" />
+                                {shareCount}
+                              </Badge>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       
                       {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">

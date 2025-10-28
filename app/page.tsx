@@ -410,7 +410,7 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-16 bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl">
+      {/* <section className="py-16 bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
@@ -420,7 +420,7 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Step 1: Upload */}
+
             <div className="text-center space-y-4">
               <div className="relative">
                 <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -440,7 +440,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Arrow 1 */}
             <div className="hidden md:flex items-center justify-center">
               <div className="flex items-center">
                 <div className="w-16 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400"></div>
@@ -448,7 +447,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Step 2: Encrypt */}
             <div className="text-center space-y-4">
               <div className="relative">
                 <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -468,7 +466,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Arrow 2 */}
             <div className="hidden md:flex items-center justify-center">
               <div className="flex items-center">
                 <div className="w-16 h-0.5 bg-gradient-to-r from-purple-400 to-green-400"></div>
@@ -476,7 +473,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Step 3: Share */}
             <div className="text-center space-y-4">
               <div className="relative">
                 <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -497,7 +493,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Bottom CTA */}
           <div className="text-center mt-12 space-y-4">
             <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm border border-white/20 rounded-lg p-4">
               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -514,7 +509,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Upload Section */}
       <section className="space-y-8">

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IPFS Proxy Test</title>
+</head>
+<body>
+    <h1>IPFS Proxy Test</h1>
+    <button onclick="testDirectIPFS()">Test Direct IPFS (should fail with CORS)</button>
+    <button onclick="testProxyIPFS()">Test Proxy IPFS (should work)</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const testCid = 'bafkreih4gqjnnwilknroblvovjnshxo4o4wriqqqndywh5ksepk6ip5fjm';
+        const resultsDiv = document.getElementById('results');
+
+        async function testDirectIPFS() {
+            resultsDiv.innerHTML = '<h3>Testing Direct IPFS...</h3>';
+            
+            try {
+                const response = await fetch(`https://gateway.pinata.cloud/ipfs/${testCid}`);
+                resultsDiv.innerHTML += `<p style="color: green;">Direct IPFS Success: ${response.status}</p>`;
+            } catch (error) {
+                resultsDiv.innerHTML += `<p style="color: red;">Direct IPFS Failed: ${error.message}</p>`;
+            }
+        }
+
+        async function testProxyIPFS() {
+            resultsDiv.innerHTML = '<h3>Testing Proxy IPFS...</h3>';
+            
+            try {
+                const response = await fetch(`/api/ipfs-proxy?cid=${testCid}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const gateway = response.headers.get('X-Used-Gateway');
+                    resultsDiv.innerHTML += `<p style="color: green;">Proxy IPFS Success: ${response.status} (via ${gateway})</p>`;
+                    resultsDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    const error = await response.json();
+                    resultsDiv.innerHTML += `<p style="color: red;">Proxy IPFS Failed: ${response.status} - ${error.error}</p>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<p style="color: red;">Proxy IPFS Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
