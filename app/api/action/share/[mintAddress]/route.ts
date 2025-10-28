@@ -20,10 +20,10 @@ export async function OPTIONS() {
 
 export async function GET(
   request: NextRequest, 
-  { params }: { params: { mintAddress: string } }
+  { params }: { params: Promise<{ mintAddress: string }> }
 ) {
   try {
-    const { mintAddress } = params;
+    const { mintAddress } = await params;
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get("owner");
     
@@ -105,10 +105,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest, 
-  { params }: { params: { mintAddress: string } }
+  { params }: { params: Promise<{ mintAddress: string }> }
 ) {
   try {
-    const { mintAddress } = params;
+    const { mintAddress } = await params;
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get("owner");
     
