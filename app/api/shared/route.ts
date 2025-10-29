@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     // Step 3: Parallel fetch of metadata
     const metadataPromises = nfts.map(async (nft: HeliusNft, index: number) => {
       try {
-        const record = sharedRecords.find((r) => r.mintAddress === nft.id);
+        const record = sharedRecords.find((r: SharedRecord) => r.mintAddress === nft.id);
         if (!record) return null;
 
         const metadataUri = nft?.content?.json_uri;
