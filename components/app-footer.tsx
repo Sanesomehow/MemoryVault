@@ -38,7 +38,7 @@ export function AppFooter() {
               </li>
               <li>
                 <Link
-                  href="https://github.com"
+                  href="https://github.com/Sanesomehow"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-600 hover:text-blue-600 transition-colors"

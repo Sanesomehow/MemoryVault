@@ -4,8 +4,7 @@
 
 MemoryVault revolutionizes photo storage and sharing by combining blockchain technology with end-to-end encryption. Your photos become NFTs on the Solana blockchain, ensuring true digital ownership while maintaining complete privacy through client-side encryption.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://MemoryVault.vercel.app)
-//change link
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://pics.siddhesh.page)
 [![Solana](https://img.shields.io/badge/Built%20on-Solana-blueviolet?style=for-the-badge)](https://solana.com)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge)](https://typescriptlang.org)
@@ -147,8 +146,7 @@ npm start
 ## 🌐 Live Demo
 
 Experience MemoryVault in action:
-//change link
-**🔗 [Live Demo](https://MemoryVault.vercel.app)**
+**🔗 [Live Demo](https://pics.siddhesh.page)**
 
 ### Demo Features
 - Connect your Solana wallet
@@ -200,8 +198,7 @@ MemoryVault/
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
-//change link
-- **Live Demo**: [https://MemoryVault.vercel.app](https://MemoryVault.vercel.app)
+- **Live Demo**: [https://MemoryVault.vercel.app](https://pics.siddhesh.page)
 - **Documentation**: [Project Documentation](PROJECT.md)
 - **Solana Ecosystem**: [Solana.com](https://solana.com)
 - **Metaplex Docs**: [docs.metaplex.com](https://docs.metaplex.com)
@@ -211,10 +208,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you find this project helpful, please give it a ⭐ on GitHub!
 
 For support and questions:
-//change email
-- 📧 Email: support@MemoryVault.com
-- 🐦 Twitter: [@MemoryVault](https://twitter.com)
-//change link
+- 📧 Email: support@sidnarsingkar@gmail.com
+- 🐦 Twitter: [@MemoryVault](https://x.com/sid_narsingkar)
 ---
 
 **Built with ❤️ on Solana | Secured by Web3 | Owned by You**
