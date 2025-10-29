@@ -68,11 +68,13 @@ interface NftData {
 function AccessDeniedScreen({ 
   nftData, 
   mintAddress, 
-  publicKey 
+  publicKey,
+  onAccessDetected 
 }: { 
   nftData: NftData; 
   mintAddress: string; 
   publicKey: PublicKey | null; 
+  onAccessDetected?: () => void;
 }) {
   const [requestStatus, setRequestStatus] = useState<"none" | "pending" | "approved" | "denied">("none");
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
@@ -113,11 +115,19 @@ function AccessDeniedScreen({
             console.log("🔑 Has decryption key:", hasDecryptionKey);
             
             if (hasDecryptionKey) {
-              console.log("✅ Access confirmed! Reloading page...");
+              console.log("✅ Access confirmed! Updating access status...");
               toast.success("Access granted! Loading photo...");
-              setTimeout(() => {
-                window.location.reload();
-              }, 1000);
+              // Clear the request status from localStorage
+              localStorage.removeItem(`access_request_${mintAddress}`);
+              // Clear polling to prevent further checks
+              if (pollingInterval) {
+                clearInterval(pollingInterval);
+                setPollingInterval(null);
+              }
+              // Notify the parent component to re-check access
+              if (onAccessDetected) {
+                onAccessDetected();
+              }
               return;
             } else {
               // Still approved but no decryption key yet
@@ -207,6 +217,15 @@ function AccessDeniedScreen({
       setPollingInterval(null);
     }
   }, [requestStatus, publicKey]);
+
+  // Cleanup polling on component unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, []);
 
   const handleRequestSent = () => {
     setRequestStatus("pending");
@@ -336,6 +355,7 @@ export default function PhotoDetail() {
   const [grantingAccess, setGrantingAccess] = useState<boolean>(false);
   const [blinkUrl, setBlinkUrl] = useState<string>();
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Structured error handling
   const [error, setError] = useState<{
@@ -343,6 +363,12 @@ export default function PhotoDetail() {
     message: string;
     type: "nft_not_found" | "load_failed" | "decrypt_failed" | "access_denied" | "grant_failed" | "general";
   } | null>(null);
+
+  // Callback to trigger re-checking access when granted through AccessDeniedScreen
+  const handleAccessDetected = () => {
+    console.log("🔄 Access detected from AccessDeniedScreen - triggering refresh");
+    setRefreshTrigger(prev => prev + 1);
+  };
 
 function generateBlink() {
   if (!publicKey) {
@@ -715,7 +741,7 @@ function generateBlink() {
     }
 
     checkAccessAndDecrypt();
-  }, [nftData, publicKey]);
+  }, [nftData, publicKey, refreshTrigger]);
 
   if (!publicKey) {
     return (
@@ -801,7 +827,8 @@ function generateBlink() {
     return <AccessDeniedScreen 
       nftData={nftData} 
       mintAddress={mintAddress} 
-      publicKey={publicKey} 
+      publicKey={publicKey}
+      onAccessDetected={handleAccessDetected}
     />;
   }
 
